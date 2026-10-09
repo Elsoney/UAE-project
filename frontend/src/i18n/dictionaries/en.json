@@ -1,0 +1,217 @@
+{
+  "meta": {
+    "siteName": "Umodai",
+    "homeTitle": "Umodai — Emirati restaurant & catering in Ajman",
+    "homeDescription": "Home-style Emirati dishes in Ajman: machboos, ouzi, harees and luqaimat. Order from our menu or request catering for family gatherings, offices and weddings.",
+    "menuTitle": "Menu — Umodai, Ajman",
+    "menuDescription": "Breakfast, Emirati main dishes, grills and desserts at Umodai in Ajman. Prices in AED.",
+    "cateringTitle": "Catering in Ajman — Umodai",
+    "cateringDescription": "Catering for family gatherings, corporate lunches and weddings in Ajman. Send a request and our team will call you to confirm details and price.",
+    "contactTitle": "Visit & contact — Umodai, Ajman",
+    "contactDescription": "Address, opening hours, phone and WhatsApp for Umodai restaurant in Ajman, with directions on Google Maps.",
+    "privacyTitle": "Privacy notice — Umodai",
+    "privacyDescription": "How Umodai collects and uses your details when you order or request catering."
+  },
+  "nav": {
+    "home": "Home",
+    "menu": "Menu",
+    "catering": "Catering",
+    "contact": "Visit us",
+    "skipToContent": "Skip to content",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "mainNavigation": "Main navigation",
+    "switchLanguage": "العربية",
+    "switchLanguageLabel": "اقرأ هذه الصفحة بالعربية"
+  },
+  "actions": {
+    "call": "Call",
+    "callUs": "Call us",
+    "whatsapp": "WhatsApp",
+    "directions": "Get directions",
+    "requestCatering": "Request catering",
+    "seeMenu": "See the full menu"
+  },
+  "home": {
+    "heroTitle": "Emirati home cooking, served in Ajman",
+    "heroLead": "Machboos, ouzi and luqaimat made the way families make them, for a quiet lunch or for a gathering of two hundred.",
+    "signatureTitle": "What people come back for",
+    "cateringTitle": "Hosting a gathering?",
+    "cateringLead": "From family dinners to weddings, tell us the date and the number of guests. We call you to plan the menu and agree the price before anything is booked.",
+    "visitTitle": "Find us in Ajman"
+  },
+  "menu": {
+    "title": "Menu",
+    "lead": "Prices are in UAE dirhams (AED).",
+    "searchLabel": "Search the menu",
+    "searchPlaceholder": "Dish name",
+    "filterLabel": "Show",
+    "allCategories": "Everything",
+    "unavailable": "Not available today",
+    "noResults": "No dishes match “{query}”. Try another name or show everything.",
+    "showEverything": "Show everything",
+    "orderingNote": "Online ordering is coming soon. To order now, call us or send a WhatsApp message."
+  },
+  "catering": {
+    "title": "Catering",
+    "lead": "Home-style Emirati food for your family, your office or your wedding, prepared in our Ajman kitchen.",
+    "packagesTitle": "Packages",
+    "guestRange": "{min}–{max} guests",
+    "guestMin": "{min} guests or more",
+    "startingFrom": "Estimated from {price} for {min} guests",
+    "includes": "Includes",
+    "terms": "Terms",
+    "howTitle": "How booking works",
+    "howLead": "Sending a request does not book the date. Your booking is confirmed only after we have spoken with you.",
+    "steps": [
+      {
+        "title": "Send your request",
+        "body": "Tell us the date, the number of guests and what you would like. No account needed."
+      },
+      {
+        "title": "We call you",
+        "body": "Our team checks availability and calls you to go through the details."
+      },
+      {
+        "title": "Agree the menu and price",
+        "body": "We confirm the final menu and price with you."
+      },
+      {
+        "title": "Pay a deposit, if needed",
+        "body": "Depending on the event we may ask for a deposit or full payment through a secure payment link."
+      },
+      {
+        "title": "Booking confirmed",
+        "body": "Only then is your booking confirmed. We email you the details."
+      }
+    ],
+    "formTitle": "Request catering",
+    "formLead": "Fields marked required must be filled in. Sending a request does not book the date.",
+    "fields": {
+      "package": "Package",
+      "packageCustom": "Something else (describe below)",
+      "customRequest": "What would you like?",
+      "customRequestHint": "Dishes, dietary needs or the kind of event.",
+      "eventDate": "Event date",
+      "eventTime": "Event time",
+      "guestCount": "Number of guests",
+      "eventLocation": "Event location",
+      "eventLocationHint": "Area and building, e.g. Al Rawda 3, Ajman.",
+      "notes": "Anything else we should know",
+      "fullName": "Full name",
+      "phone": "Mobile number",
+      "phoneHint": "UAE numbers like 050 123 4567.",
+      "email": "Email",
+      "emailHint": "We send your request reference here.",
+      "marketingConsent": "Send me occasional news and offers from Umodai. I can unsubscribe at any time.",
+      "required": "required",
+      "optional": "optional"
+    },
+    "privacyNotice": "We use your details only to handle this request and to contact you about it.",
+    "privacyLink": "Privacy notice",
+    "submit": "Send request",
+    "errorSummary": "Please correct the highlighted fields.",
+    "onlineSoonTitle": "Your details are ready to send",
+    "onlineSoonBody": "Online requests open soon. For now, send these details to us on WhatsApp. This does not book the date yet; we will call you to confirm.",
+    "sendOnWhatsapp": "Send on WhatsApp",
+    "editDetails": "Edit details",
+    "whatsappIntro": "Hello Umodai, I would like to request catering:"
+  },
+  "contact": {
+    "title": "Visit us",
+    "lead": "Come in, call ahead or message us on WhatsApp.",
+    "address": "Address",
+    "hours": "Opening hours",
+    "phone": "Phone",
+    "email": "Email",
+    "openInMaps": "Open in Google Maps",
+    "days": {
+      "Saturday": "Saturday",
+      "Sunday": "Sunday",
+      "Monday": "Monday",
+      "Tuesday": "Tuesday",
+      "Wednesday": "Wednesday",
+      "Thursday": "Thursday",
+      "Friday": "Friday"
+    }
+  },
+  "footer": {
+    "privacy": "Privacy notice",
+    "placeholderNotice": "Preview: address, phone numbers, hours and menu are placeholders until confirmed by Umodai."
+  },
+  "errors": {
+    "required": "Please fill in this field.",
+    "email": "Enter a valid email address, like name@example.com.",
+    "phone": "Enter a valid mobile number, like 050 123 4567.",
+    "tooLong": "This is too long. Please shorten it.",
+    "date": "Choose a valid date.",
+    "time": "Choose a valid time.",
+    "datePast": "This date has passed. Choose a future date.",
+    "dateBlocked": "We are fully booked on this date. Choose another date or contact us.",
+    "leadTime": "We need at least two days' notice. Choose a later date or call us.",
+    "guestCount": "Enter a number of guests that fits the selected package.",
+    "packageOrCustom": "Choose a package or describe what you would like.",
+    "packageUnavailable": "This package is no longer available. Choose another one.",
+    "deliveryAddress": "Enter the delivery address.",
+    "cartEmpty": "Your order is empty.",
+    "quantity": "Choose a quantity between 1 and 50.",
+    "generic": "Something in this field is not right. Please check it."
+  },
+  "notFound": {
+    "title": "We could not find that page",
+    "body": "The link may be old or mistyped.",
+    "home": "Go to the home page"
+  },
+  "error": {
+    "title": "This page did not load",
+    "body": "Please try again. If it keeps happening, call us and we will help.",
+    "retry": "Try again"
+  },
+  "admin": {
+    "previewBanner": "Staff area preview — sample data only. Sign-in and live data arrive in the admin release."
+  },
+  "privacy": {
+    "title": "Privacy notice",
+    "draft": "Draft — pending legal review under UAE data-protection law before launch.",
+    "sections": [
+      {
+        "heading": "What we collect",
+        "body": [
+          "When you place an order or request catering we collect your name, mobile number and email address, and the details of your order or event (date, time, number of guests, location and notes).",
+          "We do not collect or store card details. Payments are handled on our payment provider's secure page."
+        ]
+      },
+      {
+        "heading": "Why we use it",
+        "body": [
+          "To prepare and deliver your order, to review and confirm catering requests, to contact you about them, and to send you confirmations and payment receipts.",
+          "We keep a record of your orders and requests so we can help you if you contact us and to meet our accounting obligations."
+        ]
+      },
+      {
+        "heading": "Confirmation emails and news are separate",
+        "body": [
+          "Confirmation and payment emails are part of handling your order. We send news or offers only if you tick the box asking for them, and you can unsubscribe at any time."
+        ]
+      },
+      {
+        "heading": "Who can see it",
+        "body": [
+          "Only Umodai staff who handle orders, and the service providers we use to run the website, payments and email, under contracts that protect your data. We do not sell your data."
+        ]
+      },
+      {
+        "heading": "How long we keep it",
+        "body": [
+          "Our retention period will be confirmed before launch."
+        ]
+      },
+      {
+        "heading": "Your choices",
+        "body": [
+          "You can ask us to see, correct or delete your details, or withdraw your consent to news and offers, by contacting us using the details on our Visit us page."
+        ]
+      }
+    ]
+  }
+}

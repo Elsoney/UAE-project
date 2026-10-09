@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   cacheComponents: true,
+  experimental: {
+    // The root layout is under app/[lang], so unmatched URLs use app/global-not-found.tsx.
+    globalNotFound: true,
+  },
   partialPrefetching: true,
   turbopack: {
     rules: {
