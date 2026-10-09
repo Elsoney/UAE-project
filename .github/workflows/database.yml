@@ -1,0 +1,45 @@
+name: Database
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migrations-and-rls:
+    name: Migrations, RLS & integrity tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: supabase
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: supabase/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Type-check tests and scripts
+        run: npm run typecheck
+
+      - name: Apply migrations and run security tests
+        run: npm test
+
+      - name: Generated database types are up to date
+        run: |
+          npm run gen:types
+          git diff --exit-code -- ../frontend/src/types/database.ts \
+            || (echo "::error::frontend/src/types/database.ts is stale. Run 'npm run gen:types' in supabase/ and commit." && exit 1)
