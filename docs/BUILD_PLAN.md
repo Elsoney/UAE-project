@@ -15,11 +15,13 @@ The pull requests are stacked, so merge them in order:
 | #4 | Arabic-first bilingual website: home, menu, catering, visit us, privacy; local SEO; accessibility | Unit |
 | #5 | Catering requests saved online (atomic, server-only) plus end-to-end tests | DB + E2E |
 | #6 | Fixes from the independent security review: 1 High, 4 Medium, 3 Low | DB + Unit |
+| #8 | Staff sign-in, plus a bilingual catering and order review dashboard | Unit + E2E |
+| #9 | Deposit payment links, verified webhook and test checkout: the full booking loop | DB + E2E |
 
 **Checks on every PR:**
-- Database: 139 tests.
-- Unit: 219 tests, with 100% coverage of business rules.
-- End-to-end: 40 checks, on desktop and mobile.
+- Database: 148 tests.
+- Unit: 232 tests, with 100% coverage of business rules.
+- End-to-end: 60 checks, on desktop and mobile.
 - Lint, typecheck and build.
 
 ## 2. P0 requirements — status
@@ -32,10 +34,10 @@ The pull requests are stacked, so merge them in order:
 | P0-F002 | Menu and catering catalog | 🟡 Public pages use placeholder data identical to the DB seed; reading from the DB and admin catalog management are next |
 | P0-F003 | Structured catering request, validation, *Pending Review* | ✅ Saved online with reference and queued email |
 | P0-F004 | Cart and guest checkout for regular orders | 🟡 Server rules, DB function and tests are done; cart/checkout screens are not built |
-| P0-F005 | Admin order and status management | 🟡 DB rules and permissions are done; staff sign-in and dashboard are next |
-| P0-F006 | Online payment (UAE gateway), verified webhooks | 🟡🔒 Provider-agnostic design, mock provider and tested webhook logic are done; **real gateway not chosen** |
-| P0-F007 | Admin-chosen deposit (none / fixed / % / full) | 🟡 Rules and DB constraints are done; admin screen and payment links are next |
-| P0-F008 | Payment, deposit, remaining-balance and refund tracking | 🟡 Data model and rules are done; admin views are next |
+| P0-F005 | Admin order and status management | ✅ Staff sign-in, catering review and order status (#8) |
+| P0-F006 | Online payment (UAE gateway), verified webhooks | 🟡🔒 Payment links, signed webhook endpoint and test checkout work end to end (#9); **real gateway not chosen** |
+| P0-F007 | Admin-chosen deposit (none / fixed / % / full) | ✅ Choice, amount computed by the DB, payment link, confirmation only after payment (#8, #9) |
+| P0-F008 | Payment, deposit, remaining-balance and refund tracking | 🟡 Deposits and payments tracked and shown to staff; balance link and refunds screen are next |
 | P0-F009 | Website attribution, immutable source | ✅ |
 | P0-F010 | Configurable commission and records | 🟡🔒 Calculation, versioning and permissions are done; **rate/basis not decided**; report screen is next |
 | P0-F011 | Google Maps, directions, Google Business Profile | 🟡🔒 Maps and directions links are done; **GBP account and real address needed** |
@@ -46,8 +48,8 @@ The pull requests are stacked, so merge them in order:
 
 ## 3. Remaining build work, in order
 
-1. **Staff sign-in and admin dashboard.** Supabase Auth, staff roles, and a list and detail view for catering requests (review, quote, choose the deposit, change status) and orders.
-2. **Payment links for catering.** Create a payment request from the deposit choice, a hosted checkout (mock until the gateway is chosen), the webhook route and the payment-status updates.
+1. ~~Staff sign-in and admin dashboard~~ ✅ #8
+2. ~~Payment links for catering deposits~~ ✅ #9. Still to do: a remaining-balance link and a refunds screen.
 3. **Cart and guest checkout screens.** Regular orders, with online payment through the same flow.
 4. **Catalog from the database, plus admin menu management** (images in Supabase Storage).
 5. **Commission records and report** for the operations owner.
@@ -61,7 +63,7 @@ The pull requests are stacked, so merge them in order:
    - GA4.
    - Search Console and Google Business Profile.
 
-Steps 1–5 are pure engineering. My estimate is about 2 to 2.5 weeks, building in the same tested, reviewed way.
+Steps 3–5 plus the balance/refund screens are pure engineering. My estimate is about 1.5 to 2 weeks, building in the same tested, reviewed way.
 
 ## 4. Timeline assessment (for approval — the deadline has not been changed)
 
