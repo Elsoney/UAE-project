@@ -20,6 +20,8 @@ export type CateringActionResult =
   | { status: "error" };
 
 export async function submitCateringAction(input: Record<string, unknown>): Promise<CateringActionResult> {
+  // Server actions are public endpoints: never trust the argument's shape.
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { status: "error" };
   // Simple bot trap: real visitors never see or fill the "website" field.
   if (typeof input.website === "string" && input.website.trim() !== "") return { status: "error" };
 
