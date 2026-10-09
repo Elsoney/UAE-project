@@ -23,7 +23,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/lib/**/*.ts"],
-      exclude: ["src/**/*.test.ts", "src/lib/supabase/database-placeholder.ts"],
+      exclude: ["src/**/*.test.ts"],
       reporter: ["text", "html"],
       thresholds: {
         // Commercial invariants (constitution III) must be fully covered.
