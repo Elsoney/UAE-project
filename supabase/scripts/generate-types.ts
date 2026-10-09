@@ -226,6 +226,9 @@ async function introspect(url: string): Promise<string> {
               uuid: "uuid",
               date: "date",
               "timestamp with time zone": "timestamptz",
+              boolean: "bool",
+              bigint: "int8",
+              integer: "int4",
             }[typeName] ?? typeName;
           return `${name}: ${tsType(udt, enumNames)}`;
         });
