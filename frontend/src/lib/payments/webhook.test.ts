@@ -11,12 +11,18 @@ class MemoryStore implements PaymentStore {
   events = new Map<string, { processedAt: boolean; error: string | null }>();
   /** Make the next savePayment throw (simulates a crash mid-processing). */
   failNextSave = false;
+  /** Report the next event as being processed by another delivery. */
+  busyNext = false;
   requests = new Map<string, StoredPaymentRequest>();
   payments = new Map<string, StoredPayment & { isTest: boolean }>();
   refunds = new Map<string, { paymentRef: string; amount: number; status: "pending" | "succeeded" | "failed" }>();
   statuses = new Map<string, string>();
 
   async recordEvent(e: VerifiedPaymentEvent) {
+    if (this.busyNext) {
+      this.busyNext = false;
+      return "busy" as const;
+    }
     const key = `${e.provider}:${e.eventId}`;
     if (this.events.get(key)?.processedAt) return "duplicate" as const;
     if (!this.events.has(key)) this.events.set(key, { processedAt: false, error: null });
@@ -280,6 +286,14 @@ describe("payment webhook", () => {
     const retry = await handlePaymentWebhook({ provider, store, ...event({ id: "evt-again" }) });
     expect(retry).toMatchObject({ outcome: "processed" });
     expect(store.requests.get("req-1")?.status).toBe("superseded");
+  });
+
+  it("asks the provider to retry while another delivery of the event is in progress", async () => {
+    const store = setup();
+    store.busyNext = true;
+    expect(await handlePaymentWebhook({ provider, store, ...event() })).toEqual({ outcome: "busy", httpStatus: 503 });
+    expect(store.payments.size).toBe(0);
+    expect(await handlePaymentWebhook({ provider, store, ...event() })).toMatchObject({ outcome: "processed" });
   });
 
   it("re-throws unexpected provider errors", async () => {

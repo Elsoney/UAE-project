@@ -110,7 +110,7 @@ test("a booking that needs a deposit cannot be confirmed before payment", async 
   await page.getByRole("button", { name: "Save price and payment" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Confirm booking" })).toHaveCount(0);
-  await expect(page.getByText("Payment links will be available")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send payment link" })).toBeVisible();
 
   // A deposit larger than the total is refused with a clear message.
   await page.getByLabel("Fixed deposit (AED)").check();

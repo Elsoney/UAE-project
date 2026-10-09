@@ -780,6 +780,7 @@ export type Database = {
           payload: Json;
           processed_at: string | null;
           processing_error: string | null;
+          processing_started_at: string | null;
           provider: string;
           provider_event_id: string;
           received_at: string;
@@ -791,6 +792,7 @@ export type Database = {
           payload: Json;
           processed_at?: string | null;
           processing_error?: string | null;
+          processing_started_at?: string | null;
           provider: string;
           provider_event_id: string;
           received_at?: string;
@@ -802,6 +804,7 @@ export type Database = {
           payload?: Json;
           processed_at?: string | null;
           processing_error?: string | null;
+          processing_started_at?: string | null;
           provider?: string;
           provider_event_id?: string;
           received_at?: string;
@@ -812,6 +815,7 @@ export type Database = {
       payment_requests: {
         Row: {
           catering_request_id: string | null;
+          checkout_url: string | null;
           created_at: string;
           created_by: string | null;
           currency: string;
@@ -833,6 +837,7 @@ export type Database = {
         };
         Insert: {
           catering_request_id?: string | null;
+          checkout_url?: string | null;
           created_at?: string;
           created_by?: string | null;
           currency?: string;
@@ -854,6 +859,7 @@ export type Database = {
         };
         Update: {
           catering_request_id?: string | null;
+          checkout_url?: string | null;
           created_at?: string;
           created_by?: string | null;
           currency?: string;
@@ -1065,6 +1071,10 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: string;
       };
+      attach_checkout: {
+        Args: { p_payment_request: string; p_checkout_id: string; p_checkout_url: string; p_email_subject: string };
+        Returns: undefined;
+      };
       catering_transition_allowed: {
         Args: { f: Database["public"]["Enums"]["catering_status"]; t: Database["public"]["Enums"]["catering_status"] };
         Returns: boolean;
@@ -1076,6 +1086,10 @@ export type Database = {
       check_submission_rate: {
         Args: { p_email: string };
         Returns: undefined;
+      };
+      claim_payment_event: {
+        Args: { p_provider: string; p_event_id: string; p_event_type: string; p_payload: Json };
+        Returns: string;
       };
       commission_setting_at: {
         Args: { at_time: string };
@@ -1121,9 +1135,17 @@ export type Database = {
         Args: { f: Database["public"]["Enums"]["order_status"]; t: Database["public"]["Enums"]["order_status"] };
         Returns: boolean;
       };
+      payment_summary: {
+        Args: { p_kind: string; p_id: string; p_is_test: boolean };
+        Returns: { total_fils: number; paid_fils: number; refunded_fils: number; required_deposit_fils: number; has_open_request: boolean; last_attempt_failed: boolean }[];
+      };
       record_marketing_opt_in: {
         Args: { p_customer: string; p_source: string; p_locale: Database["public"]["Enums"]["locale"] };
         Returns: undefined;
+      };
+      request_catering_payment: {
+        Args: { p_request: string; p_staff: string; p_provider: string; p_is_test: boolean; p_expires_at: string };
+        Returns: { payment_request_id: string; requested_amount_fils: number; total_fils: number; reference: string; contact_name: string; contact_email: string; locale: Database["public"]["Enums"]["locale"] }[];
       };
       submit_catering_request: {
         Args: { p: Json };

@@ -41,7 +41,18 @@ export async function getCateringRequest(id: string) {
     .eq("entity_id", id)
     .order("changed_at", { ascending: true })
     .order("id", { ascending: true });
-  return { request: data, history: history ?? [] };
+  const { data: requests } = await supabase
+    .from("payment_requests")
+    .select("id, status, requested_amount_fils, checkout_url, expires_at, is_test, created_at")
+    .eq("catering_request_id", id)
+    .order("created_at", { ascending: false });
+  const { data: payments } = await supabase
+    .from("payments")
+    .select("id, status, amount_fils, paid_at, is_test")
+    .eq("catering_request_id", id)
+    .eq("status", "succeeded")
+    .order("paid_at", { ascending: true });
+  return { request: data, history: history ?? [], paymentRequests: requests ?? [], payments: payments ?? [] };
 }
 
 export async function listOrders() {

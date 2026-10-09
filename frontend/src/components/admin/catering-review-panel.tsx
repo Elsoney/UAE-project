@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent, type ReactNode } from "react";
-import { reviewCateringAction, type StaffActionResult } from "@/app/[lang]/admin/actions";
+import { requestPaymentAction, reviewCateringAction, type StaffActionResult } from "@/app/[lang]/admin/actions";
 import type { Locale } from "@/i18n/config";
 import { interpolate, type Dictionary } from "@/i18n/dictionary";
 import { buildPaymentRequest, type DepositChoice } from "@/lib/domain/deposit";
@@ -22,6 +22,8 @@ type Props = {
   depositFixedFils: number | null;
   adminNotes: string | null;
   canEdit: boolean;
+  openLink: { url: string | null; amountFils: number; expiresAt: string | null } | null;
+  testMode: boolean;
 };
 
 const CLOSED: CateringStatus[] = ["completed", "rejected", "cancelled"];
@@ -91,7 +93,12 @@ export function CateringReviewPanel(props: Props) {
   const canConfirm =
     (status === "quoted" && props.depositType === "none") ||
     (status === "awaiting_payment" && (props.paymentStatus === "deposit_paid" || props.paymentStatus === "fully_paid"));
-  const needsPayment = status === "quoted" && props.depositType !== null && props.depositType !== "none";
+  const needsPayment =
+    (status === "quoted" || status === "awaiting_payment") &&
+    props.depositType !== null &&
+    props.depositType !== "none" &&
+    props.paymentStatus !== "deposit_paid" &&
+    props.paymentStatus !== "fully_paid";
 
   return (
     <div className="flex flex-col gap-8" aria-busy={pending}>
@@ -173,7 +180,41 @@ export function CateringReviewPanel(props: Props) {
             </button>
           )}
         </div>
-        {needsPayment && <p className="mt-3 max-w-[60ch] text-sm text-date">{t.paymentLinksSoon}</p>}
+        {needsPayment && (
+          <div className="mt-4 flex flex-col gap-3 bg-white p-5">
+            {props.openLink && (
+              <>
+                <p className="tabular font-semibold">{interpolate(t.paymentLinkSent, { amount: formatAed(props.openLink.amountFils, locale) })}</p>
+                {props.openLink.expiresAt && (
+                  <p className="tabular text-sm text-date">
+                    {interpolate(t.paymentLinkExpires, {
+                      date: new Intl.DateTimeFormat(locale === "ar" ? "ar-AE" : "en-AE", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Dubai" }).format(new Date(props.openLink.expiresAt)),
+                    })}
+                  </p>
+                )}
+                {props.openLink.url && (
+                  <a href={props.openLink.url} target="_blank" rel="noopener noreferrer" className="break-all text-sm font-semibold text-indigo underline underline-offset-4" dir="ltr">
+                    {t.openPaymentLink}
+                  </a>
+                )}
+              </>
+            )}
+            <div>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  setResult(null);
+                  startTransition(async () => setResult(await requestPaymentAction(props.requestId)));
+                }}
+                className={buttonClass(props.openLink ? "secondary" : "primary")}
+              >
+                {props.openLink ? t.resendPaymentLink : t.sendPaymentLink}
+              </button>
+            </div>
+            {props.testMode && <p className="text-sm text-date">{t.testMode}</p>}
+          </div>
+        )}
       </section>
 
       {!CLOSED.includes(status) && (
