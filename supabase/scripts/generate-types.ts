@@ -120,17 +120,24 @@ async function introspect(url: string): Promise<string> {
     ).rows;
 
     const functions = (
-      await client.query<{ name: string; args: string; returns: string; retset: boolean }>(
+      await client.query<{ name: string; args: string; returns: string; retset: boolean; out_names: string[] | null; out_types: string[] | null }>(
         `select p.proname as name,
                 coalesce(pg_get_function_arguments(p.oid), '') as args,
                 t.typname as returns,
-                p.proretset as retset
+                p.proretset as retset,
+                case when p.proargmodes is null then null else
+                  array(select p.proargnames[i] from generate_subscripts(p.proargmodes, 1) i where p.proargmodes[i] = 't' order by i)::text[]
+                end as out_names,
+                case when p.proargmodes is null then null else
+                  array(select format_type(p.proallargtypes[i], null) from generate_subscripts(p.proargmodes, 1) i where p.proargmodes[i] = 't' order by i)::text[]
+                end as out_types
            from pg_proc p
            join pg_namespace n on n.oid = p.pronamespace
            join pg_type t on t.oid = p.prorettype
           where n.nspname = 'public'
             and t.typname <> 'trigger'
-            and has_function_privilege('authenticated', p.oid, 'execute')
+            and (has_function_privilege('authenticated', p.oid, 'execute')
+                 or has_function_privilege('service_role', p.oid, 'execute'))
           order by p.proname`,
       )
     ).rows;
@@ -222,7 +229,13 @@ async function introspect(url: string): Promise<string> {
             }[typeName] ?? typeName;
           return `${name}: ${tsType(udt, enumNames)}`;
         });
+      const pgToUdt = (name: string) =>
+        ({ text: "text", uuid: "uuid", bigint: "int8", integer: "int4", boolean: "bool", date: "date", "timestamp with time zone": "timestamptz" })[name] ??
+        name.replace(/^public\./, "");
       let ret = enumNames.has(f.returns) || scalar[f.returns] ? tsType(f.returns, enumNames) : null;
+      if (ret === null && f.out_names && f.out_names.length > 0 && f.out_types) {
+        ret = `{ ${f.out_names.map((n, i) => `${n}: ${tsType(pgToUdt(f.out_types![i]), enumNames)}`).join("; ")} }`;
+      }
       if (ret === null) {
         ret = tables.includes(f.returns)
           ? `Database["public"]["Tables"]["${f.returns}"]["Row"]`

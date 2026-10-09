@@ -1,15 +1,16 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
-import { whatsappLink } from "@/config/business";
+import { submitCateringAction } from "@/app/[lang]/catering/actions";
+import { telLink, whatsappLink } from "@/config/business";
 import type { CateringPackage } from "@/data/catalog";
 import type { Locale } from "@/i18n/config";
 import { errorMessage, interpolate, type Dictionary } from "@/i18n/dictionary";
 import { cateringRequestSchema, type CateringRequest } from "@/lib/domain/catering";
 import { fieldErrors, type ValidationMessageKey } from "@/lib/domain/validation";
 import { buttonClass } from "../ui/button-link";
-import { ChatIcon } from "../site/contact-bar";
+import { ChatIcon, PhoneIcon } from "../site/contact-bar";
 import { Field, describedBy, inputClass } from "./field";
 
 const CUSTOM = "custom";
@@ -19,56 +20,97 @@ type Props = {
   packages: CateringPackage[];
   t: Dictionary["catering"];
   errors: Dictionary["errors"];
+  actions: Dictionary["actions"];
   preselectedPackage?: string;
 };
 
+type Outcome = { kind: "received"; reference: string; email: string } | { kind: "offline"; request: CateringRequest } | null;
+
 /**
  * Guest catering request form. Validation uses the same rules as the server
- * (lib/domain/catering), with messages in the visitor's language. Submitting
- * never implies a confirmed booking (owner §4).
+ * (lib/domain/catering), with messages in the visitor's language; the server
+ * validates again and stores the request as "pending review". Submitting never
+ * implies a confirmed booking (owner §4). The form stays mounted so the
+ * visitor's entries survive server-side errors.
  */
-export function CateringForm({ locale, packages, t, errors, preselectedPackage }: Props) {
+export function CateringForm({ locale, packages, t, errors, actions, preselectedPackage }: Props) {
   const [fieldErrs, setFieldErrs] = useState<Record<string, ValidationMessageKey>>({});
   const [packageId, setPackageId] = useState(preselectedPackage ?? packages[0]?.id ?? CUSTOM);
-  const [ready, setReady] = useState<CateringRequest | null>(null);
+  const [outcome, setOutcome] = useState<Outcome>(null);
+  const [notice, setNotice] = useState<"rate_limited" | "error" | null>(null);
+  const [pending, startTransition] = useTransition();
+  const idempotencyKey = useRef<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
-  const readyRef = useRef<HTMLDivElement>(null);
+  const outcomeRef = useRef<HTMLDivElement>(null);
   const f = t.fields;
 
   const err = (name: string) => (fieldErrs[name] ? errorMessage(errors, fieldErrs[name]) : undefined);
 
+  function showErrors(next: Record<string, ValidationMessageKey>) {
+    setFieldErrs(next);
+    requestAnimationFrame(() => summaryRef.current?.focus());
+  }
+
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
     const data = Object.fromEntries(new FormData(event.currentTarget));
     const schema = cateringRequestSchema({
       now: new Date(),
-      // Blocked dates are checked again by the server when online submission opens.
+      // Blocked dates are checked by the server.
       blockedDates: new Set(),
       packages: new Map(packages.map((p) => [p.id, { minimumGuests: p.minimumGuests, maximumGuests: p.maximumGuests }])),
     });
-    const result = schema.safeParse({
+    const input = {
       ...data,
       packageId: data.packageId === CUSTOM ? "" : data.packageId,
       marketingConsent: data.marketingConsent === "on",
       locale,
-    });
+    };
+    const result = schema.safeParse(input);
     if (!result.success) {
-      setFieldErrs(fieldErrors(result.error));
-      setReady(null);
-      requestAnimationFrame(() => summaryRef.current?.focus());
+      showErrors(fieldErrors(result.error));
       return;
     }
     setFieldErrs({});
-    setReady(result.data);
-    requestAnimationFrame(() => readyRef.current?.focus());
+    setNotice(null);
+    // One key per attempt: retries after a network error never create a second request.
+    idempotencyKey.current ??= crypto.randomUUID();
+    const request = result.data;
+    startTransition(async () => {
+      let response;
+      try {
+        response = await submitCateringAction({ ...input, idempotencyKey: idempotencyKey.current });
+      } catch {
+        setNotice("error");
+        return;
+      }
+      switch (response.status) {
+        case "received":
+          idempotencyKey.current = null;
+          setOutcome({ kind: "received", reference: response.reference, email: request.email });
+          requestAnimationFrame(() => outcomeRef.current?.focus());
+          break;
+        case "offline":
+          setOutcome({ kind: "offline", request });
+          requestAnimationFrame(() => outcomeRef.current?.focus());
+          break;
+        case "invalid":
+          showErrors(response.errors);
+          break;
+        default:
+          setNotice(response.status);
+      }
+    });
   }
 
   const selected = packages.find((p) => p.id === packageId);
   const name = (p: CateringPackage) => (locale === "ar" ? p.nameAr : p.nameEn);
 
-  if (ready) {
+  function whatsappDetails(ready: CateringRequest) {
     const pkg = packages.find((p) => p.id === ready.packageId);
-    const lines = [
+    return [
       t.whatsappIntro,
       `${f.package}: ${pkg ? name(pkg) : f.packageCustom}`,
       ready.customRequest ? `${f.customRequest}: ${ready.customRequest}` : null,
@@ -80,28 +122,74 @@ export function CateringForm({ locale, packages, t, errors, preselectedPackage }
       `${f.fullName}: ${ready.fullName}`,
       `${f.phone}: ${ready.phone}`,
       `${f.email}: ${ready.email}`,
-    ].filter(Boolean);
-    return (
-      <div ref={readyRef} tabIndex={-1} role="status" className="border-s-4 border-palm bg-white p-6">
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  const outcomePanel =
+    outcome?.kind === "received" ? (
+      <div ref={outcomeRef} tabIndex={-1} role="status" className="border-s-4 border-palm bg-white p-6">
+        <h3 className="font-display text-2xl text-indigo">{t.receivedTitle}</h3>
+        <p className="mt-3 text-lg font-semibold">{interpolate(t.receivedReference, { reference: outcome.reference })}</p>
+        <p className="mt-3 max-w-[60ch]">{t.receivedBody}</p>
+        <p className="mt-3 max-w-[60ch] text-date">{interpolate(t.receivedEmail, { email: outcome.email })}</p>
+        <button
+          type="button"
+          onClick={() => {
+            formRef.current?.reset();
+            setOutcome(null);
+          }}
+          className={`${buttonClass("secondary")} mt-6`}
+        >
+          {t.newRequest}
+        </button>
+      </div>
+    ) : outcome?.kind === "offline" ? (
+      <div ref={outcomeRef} tabIndex={-1} role="status" className="border-s-4 border-palm bg-white p-6">
         <h3 className="font-display text-2xl text-indigo">{t.onlineSoonTitle}</h3>
         <p className="mt-3 max-w-[60ch]">{t.onlineSoonBody}</p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <a href={whatsappLink(locale, lines.join("\n"))} target="_blank" rel="noopener noreferrer" className={buttonClass("whatsapp")}>
+          <a href={whatsappLink(locale, whatsappDetails(outcome.request))} target="_blank" rel="noopener noreferrer" className={buttonClass("whatsapp")}>
             <ChatIcon />
             {t.sendOnWhatsapp}
           </a>
-          <button type="button" onClick={() => setReady(null)} className={buttonClass("secondary")}>
+          <button type="button" onClick={() => setOutcome(null)} className={buttonClass("secondary")}>
             {t.editDetails}
           </button>
         </div>
       </div>
-    );
-  }
+    ) : null;
 
   const hasErrors = Object.keys(fieldErrs).length > 0;
 
   return (
-    <form noValidate onSubmit={onSubmit} className="flex flex-col gap-6" aria-describedby="catering-form-lead">
+    <>
+    {outcomePanel}
+    <form
+      ref={formRef}
+      noValidate
+      onSubmit={onSubmit}
+      hidden={outcome !== null}
+      aria-busy={pending}
+      className="flex flex-col gap-6"
+      aria-describedby="catering-form-lead"
+    >
+      {notice && (
+        <div role="alert" className="border-s-4 border-madder bg-white p-4">
+          <p className="font-semibold text-madder">{notice === "rate_limited" ? t.rateLimited : t.submitError}</p>
+          <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
+            <a href={telLink()} className="inline-flex items-center gap-2 underline underline-offset-4">
+              <PhoneIcon />
+              {actions.callUs}
+            </a>
+            <a href={whatsappLink(locale)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 underline underline-offset-4">
+              <ChatIcon />
+              {actions.whatsapp}
+            </a>
+          </div>
+        </div>
+      )}
       {hasErrors && (
         <div ref={summaryRef} tabIndex={-1} role="alert" className="border-s-4 border-madder bg-white p-4 font-semibold text-madder">
           {t.errorSummary}
@@ -256,11 +344,18 @@ export function CateringForm({ locale, packages, t, errors, preselectedPackage }
         </Link>
       </p>
 
+      {/* Bot trap: hidden from people and assistive technology. */}
+      <div aria-hidden="true" className="absolute -start-[10000px] h-px w-px overflow-hidden">
+        <label htmlFor="website">{t.honeypot}</label>
+        <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off" />
+      </div>
+
       <div>
-        <button type="submit" className={buttonClass("primary")}>
-          {t.submit}
+        <button type="submit" disabled={pending} className={`${buttonClass("primary")} disabled:opacity-70`}>
+          {pending ? t.sending : t.submit}
         </button>
       </div>
     </form>
+    </>
   );
 }

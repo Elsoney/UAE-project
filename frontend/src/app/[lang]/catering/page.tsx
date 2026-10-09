@@ -97,7 +97,7 @@ export default async function CateringPage({ params }: PageProps<"/[lang]/cateri
             {t.formLead}
           </p>
           <div className="mt-8">
-            <CateringForm locale={locale} packages={cateringPackages} t={t} errors={dict.errors} />
+            <CateringForm locale={locale} packages={cateringPackages} t={t} errors={dict.errors} actions={dict.actions} />
           </div>
         </section>
       </div>

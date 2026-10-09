@@ -92,3 +92,19 @@ export interface SubmissionPort {
   /** Atomically: create/reuse customer, append consent, insert request, queue email. */
   createCateringRequest(request: NewCateringRequest): Promise<SubmittedCateringRequest>;
 }
+
+/** Business-rule rejections raised by storage (the database re-checks the rules). */
+export type RejectionCode =
+  | "date_blocked"
+  | "date_past"
+  | "package_unavailable"
+  | "item_unavailable"
+  | "price_changed"
+  | "rate_limited";
+
+export class SubmissionRejected extends Error {
+  constructor(readonly code: RejectionCode) {
+    super(`submission rejected: ${code}`);
+    this.name = "SubmissionRejected";
+  }
+}

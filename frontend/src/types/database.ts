@@ -1058,6 +1058,14 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      acting_role: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      check_submission_rate: {
+        Args: { p_email: string };
+        Returns: undefined;
+      };
       commission_setting_at: {
         Args: { at_time: string };
         Returns: Database["public"]["Tables"]["commission_settings"]["Row"];
@@ -1069,6 +1077,10 @@ export type Database = {
       current_admin_role: {
         Args: Record<PropertyKey, never>;
         Returns: Database["public"]["Enums"]["admin_role"];
+      };
+      generate_public_reference: {
+        Args: { prefix: string };
+        Returns: string;
       };
       get_blocked_dates: {
         Args: { from_date: string; to_date: string };
@@ -1089,6 +1101,22 @@ export type Database = {
       is_valid_email: {
         Args: { value: string };
         Returns: boolean;
+      };
+      record_marketing_opt_in: {
+        Args: { p_customer: string; p_source: string; p_locale: Database["public"]["Enums"]["locale"] };
+        Returns: undefined;
+      };
+      submit_catering_request: {
+        Args: { p: Json };
+        Returns: { reference: string; status: Database["public"]["Enums"]["catering_status"]; duplicate: boolean }[];
+      };
+      submit_guest_order: {
+        Args: { p: Json };
+        Returns: { reference: string; order_status: Database["public"]["Enums"]["order_status"]; payment_status: Database["public"]["Enums"]["payment_status"]; total_fils: number; duplicate: boolean }[];
+      };
+      upsert_guest_customer: {
+        Args: { p_full_name: string; p_phone: string; p_email: string; p_locale: Database["public"]["Enums"]["locale"] };
+        Returns: string;
       };
     };
     Enums: {
