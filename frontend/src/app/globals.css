@@ -1,39 +1,120 @@
 @import "tailwindcss";
 
+/*
+ * Umodai design tokens — drawn from sadu weaving (madder red, indigo and
+ * saffron on undyed wool) and lime-plastered walls.
+ */
 :root {
-  --background: #f8f5f0;
-  --foreground: #111827;
-  --muted: #64748b;
-  --primary: #b45309;
-  --primary-soft: #fef3c7;
+  --plaster: #faf8f3;
+  --plaster-deep: #f1ece2;
+  --madder: #8e2424;
+  --madder-deep: #6f1a1a;
+  --indigo: #1e2640;
+  --saffron: #d9a43a;
+  --date: #5a3a2e;
+  --palm: #3d5a40;
+  --rule: #d9d1c3;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-plaster: var(--plaster);
+  --color-plaster-deep: var(--plaster-deep);
+  --color-madder: var(--madder);
+  --color-madder-deep: var(--madder-deep);
+  --color-indigo: var(--indigo);
+  --color-saffron: var(--saffron);
+  --color-date: var(--date);
+  --color-palm: var(--palm);
+  --color-rule: var(--rule);
+  /* Latin face first: its file has no Arabic glyphs, so Arabic falls through to the Arabic face. */
+  --font-sans: var(--font-body-latin), var(--font-body-arabic), system-ui, sans-serif;
+  --font-display: var(--font-display-latin), var(--font-display), var(--font-body-arabic), sans-serif;
 }
 
 html {
-  scroll-behavior: smooth;
+  background: var(--plaster);
+  color: var(--indigo);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Arabic text reads best with a little more line height. */
+html[lang="ar"] body {
+  line-height: 1.85;
+}
+
+html[lang="en"] body {
+  line-height: 1.6;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  background: var(--plaster);
+  color: var(--indigo);
 }
 
-* {
-  box-sizing: border-box;
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
-img {
-  max-width: 100%;
-  display: block;
+/* Visible keyboard focus everywhere (WCAG 2.4.7). */
+:focus-visible {
+  outline: 3px solid var(--saffron);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
-a {
-  text-decoration: none;
+/*
+ * The sadu band: a woven strip of madder, indigo and saffron triangles with
+ * a small diamond rhythm, built from gradients (no images). It marks the
+ * edges of the page and the top of each catering package.
+ */
+.sadu-band {
+  --sadu-h: 14px;
+  height: var(--sadu-h);
+  background-color: var(--madder);
+  background-image:
+    linear-gradient(135deg, var(--indigo) 25%, transparent 25%),
+    linear-gradient(225deg, var(--indigo) 25%, transparent 25%),
+    linear-gradient(315deg, var(--saffron) 25%, transparent 25%),
+    linear-gradient(45deg, var(--saffron) 25%, transparent 25%);
+  background-size: calc(var(--sadu-h) * 2) var(--sadu-h);
+  background-position:
+    0 0,
+    0 0,
+    var(--sadu-h) 0,
+    var(--sadu-h) 0;
+  border-block: 3px solid var(--plaster);
+  box-shadow: 0 0 0 1px var(--madder-deep);
+}
+
+.sadu-band--thin {
+  --sadu-h: 8px;
+  border-block-width: 2px;
+}
+
+/* Printed-menu leader dots between a dish name and its price. */
+.menu-leader {
+  flex: 1 1 auto;
+  min-width: 1.5rem;
+  border-block-end: 2px dotted var(--rule);
+  margin-inline: 0.5rem;
+  transform: translateY(-0.35em);
+}
+
+/* Prices and numbers keep Western digits aligned in both directions. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Inside a coloured panel the band needs no plaster edging. */
+.sadu-band--flush {
+  border-block: 0;
+  box-shadow: none;
+}
+
+/* Never let the mobile call/WhatsApp bar sit over a field being typed in. */
+body:has(form :focus) .contact-bar {
+  display: none;
 }
