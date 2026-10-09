@@ -118,3 +118,8 @@ body {
 body:has(form :focus) .contact-bar {
   display: none;
 }
+
+/* Staff pages don't need the customer call/WhatsApp bar. */
+body:has(.staff-area) .contact-bar {
+  display: none;
+}
