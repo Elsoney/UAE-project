@@ -16,6 +16,8 @@ const supabaseDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 declare module "vitest" {
   export interface ProvidedContext {
     databaseUrl: string;
+    /** Separate database for tests that must commit (concurrency); empty when TEST_DATABASE_URL is used. */
+    concurrencyDatabaseUrl: string;
   }
 }
 
@@ -67,6 +69,14 @@ export default async function setup(project: TestProject) {
 
   await applySchema(url);
   project.provide("databaseUrl", url);
+
+  let concurrencyUrl = "";
+  if (server) {
+    await server.createDatabase("umodai_concurrency");
+    concurrencyUrl = url.replace(/\/umodai_test$/, "/umodai_concurrency");
+    await applySchema(concurrencyUrl);
+  }
+  project.provide("concurrencyDatabaseUrl", concurrencyUrl);
 
   return async () => {
     await server?.stop();

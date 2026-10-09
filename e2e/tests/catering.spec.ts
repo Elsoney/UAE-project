@@ -77,7 +77,7 @@ test("a guest requests catering in Arabic without an account", async ({ page }) 
   expect(outbox).toEqual([{ template: "catering_request_received", locale: "ar", status: "queued" }]);
 });
 
-test("a returning customer is recognised by email and consent is recorded only on opt-in", async ({ page }) => {
+test("a returning customer is recognised by email and a marketing opt-in waits for confirmation", async ({ page }) => {
   const email = uniqueEmail("omar");
   await page.goto(`${site()}/en/catering`);
   await fillRequest(page, en, { email, name: "Omar Saeed" });
@@ -97,9 +97,13 @@ test("a returning customer is recognised by email and consent is recorded only o
     [email],
   );
   // One customer, both requests linked, profile not overwritten by the second submission.
-  expect(customers).toEqual([{ full_name: "Omar Saeed", marketing_consent: true, requests: "2" }]);
-  const consent = await query(`select e.source from consent_events e join customers c on c.id = e.customer_id where c.email_normalized = lower($1)`, [email]);
-  expect(consent).toEqual([{ source: "catering_form" }]);
+  // Ticking the box records an opt-in request; consent applies only after the email owner confirms it.
+  expect(customers).toEqual([{ full_name: "Omar Saeed", marketing_consent: false, requests: "2" }]);
+  const consent = await query(
+    `select e.source, e.verified_at from consent_events e join customers c on c.id = e.customer_id where c.email_normalized = lower($1)`,
+    [email],
+  );
+  expect(consent).toEqual([{ source: "catering_form", verified_at: null }]);
 });
 
 test("the form explains problems in the visitor's language and keeps what they typed", async ({ page }) => {

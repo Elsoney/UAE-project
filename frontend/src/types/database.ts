@@ -329,7 +329,7 @@ export type Database = {
           cancellation_treatment: string;
           created_at?: string;
           created_by?: string | null;
-          effective_from: string;
+          effective_from?: string;
           id?: string;
           rate_percent: number;
           refund_treatment: string;
@@ -426,6 +426,7 @@ export type Database = {
           id: number;
           locale: Database["public"]["Enums"]["locale"] | null;
           source: string;
+          verified_at: string | null;
         };
         Insert: {
           consent_type: Database["public"]["Enums"]["consent_type"];
@@ -435,6 +436,7 @@ export type Database = {
           id?: never;
           locale?: Database["public"]["Enums"]["locale"] | null;
           source: string;
+          verified_at?: string | null;
         };
         Update: {
           consent_type?: Database["public"]["Enums"]["consent_type"];
@@ -444,6 +446,7 @@ export type Database = {
           id?: never;
           locale?: Database["public"]["Enums"]["locale"] | null;
           source?: string;
+          verified_at?: string | null;
         };
         Relationships: [
           {
@@ -1062,6 +1065,14 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: string;
       };
+      catering_transition_allowed: {
+        Args: { f: Database["public"]["Enums"]["catering_status"]; t: Database["public"]["Enums"]["catering_status"] };
+        Returns: boolean;
+      };
+      check_reference: {
+        Args: { p_reference: string; p_prefix: string };
+        Returns: string;
+      };
       check_submission_rate: {
         Args: { p_email: string };
         Returns: undefined;
@@ -1100,6 +1111,14 @@ export type Database = {
       };
       is_valid_email: {
         Args: { value: string };
+        Returns: boolean;
+      };
+      lock_submission: {
+        Args: { p_key: string; p_email: string };
+        Returns: undefined;
+      };
+      order_transition_allowed: {
+        Args: { f: Database["public"]["Enums"]["order_status"]; t: Database["public"]["Enums"]["order_status"] };
         Returns: boolean;
       };
       record_marketing_opt_in: {
