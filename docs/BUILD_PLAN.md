@@ -1,76 +1,101 @@
-# Umodai — Gap Analysis and Build Plan
+# Umodai — Build Plan, Status and Timeline
 
-**Date:** 2026-10-09 · **Baseline:** `master` @ `9e3cebc` + PR #1 (self-hosted fonts)
-**Sources reviewed:** `PRD.md` (= `complete_project_handover/docs/source/UMODAI_PRD_SOURCE.txt`), `specs/001-umodai-restaurant/{spec,plan,tasks}.md`, `.specify/memory/constitution.md`, `AUDIT_REPORT.md`, every file in `complete_project_handover/`, all application code and `supabase/schema.sql`.
+**Updated:** 2026-10-09 (end of day) · **Target:** production-ready v1 within 5 weeks of the October 2026 start (PRD §3)
+**Binding inputs:** `PRD.md` (PRD-001 v1.0), `specs/001-umodai-restaurant/*`, `.specify/memory/constitution.md`, the handover docs, `AUDIT_REPORT.md` and the owner's instructions of 2026-10-09 (§1–§10).
 
-## 1. Where the project is today
+## 1. Where we are
 
-| Area | State |
-|---|---|
-| Storefront | Static, English-only single page (`/`) with hard-coded menu/packages from `src/data/site.ts`. No mobile nav, placeholder phone/WhatsApp, enquiry form does not submit. |
-| Admin | `/admin` is a static mock with fake orders, **no authentication**, and is linked from the public header. |
-| Database | One non-migratable `schema.sql` (8 tables). **Critical:** every sensitive table (orders, customers' data, payments, commissions, `admin_users`) is open to *any* signed-in Supabase user, who can also add themselves as admin. No constraints, no bilingual fields, no payment idempotency, no audit trail. Unknown whether it was ever applied to a live project. |
-| Supabase client | `src/lib/supabase.ts` exists but is never imported. |
-| Ordering, cart, checkout, payments, deposits, refunds, commissions | Not started. |
-| Arabic / RTL | Not started (`<html lang="en" dir="ltr">` hard-coded). |
-| SEO | Title + description only. No sitemap, robots, JSON-LD, hreflang. |
-| Quality | Lint + typecheck + build pass. **No tests, no CI.** 0 production npm vulnerabilities. |
-| tasks.md | 33 tasks, all unchecked; T001 effectively done, ~10 partial, rest not started. Audit estimates 5–15 % of v1 complete. |
+The pull requests are stacked, so merge them in order:
 
-## 2. Rules every change follows (from the constitution and handover)
-
-- Trace every feature to PRD-001; P0 first. Strict TypeScript; lint, typecheck, build and tests must pass.
-- **Tests are mandatory** for pricing, deposits, payments, refunds, commission, authorization and state transitions.
-- Authorization is enforced on the server and in RLS — never only by hiding UI. Service-role key is server-only.
-- All schema/RLS changes are **versioned migrations**; nobody can grant themselves a role.
-- Money in exact AED minor units (fils). A browser redirect never proves payment — only a verified, idempotent webhook does. Payment status is separate from order status.
-- Catering starts at *Pending Review* and needs human approval. Deposit: none / fixed / percentage (0 < p ≤ 100) / full; never above the confirmed total; snapshotted on each payment request.
-- `source` is set server-side and cannot be silently changed. **No default commission rate** (the PRD's 7 % is only an example).
-- Arabic RTL and English LTR are first-class from day one; WCAG 2.1 AA on essential flows.
-- **Owner approval required** before: deploying, applying migrations to any shared/production database, enabling live payments, changing permissions or architecture, or handling real customer data.
-
-## 3. Decisions taken to unblock development (reversible; flag if you disagree)
-
-| Open question | Working decision |
-|---|---|
-| Payment provider (TBD) | Provider-agnostic `PaymentProvider` interface + a **mock/sandbox adapter** for development and tests. Real gateway plugs in later without schema changes. |
-| Commission rate/basis (TBD) | Stored as configuration with **no default**; basis selectable (gross / collected / net of refunds). Records are not created until a rate is configured. |
-| Customer accounts | Guest checkout and guest catering enquiries (no account needed), per PRD §9. |
-| URL & language | `/{lang}/…` with `ar` and `en`; locale detected from the browser, falling back to Arabic. |
-| Server logic location | Next.js server actions / route handlers (incl. payment webhook) with a server-only Supabase service client; Supabase Edge Functions not needed for v1. |
-| Order vs catering | Separate `orders` and `catering_requests` entities; payments, payment requests and commissions reference exactly one of them. |
-| Order status vs payment status | Two separate columns and enums. Payment-flavoured order statuses from the PRD list are expressed through `payment_status`. |
-| VAT | Not mentioned in the PRD — **open question for the owner**; amounts are stored so VAT can be added later. |
-
-## 4. Phased build plan
-
-### Phase 1 — Foundations (in progress, three parallel workstreams)
-
-| Workstream | Branch | Scope |
+| PR | What it delivers | Tests |
 |---|---|---|
-| **A. Database & security** | `feat/db-migrations-rls` | Replace `schema.sql` with versioned migrations covering the full PRD data model, CHECK constraints and enums, `updated_at`/status-history/immutable-source triggers, audit log, `is_admin()`-based least-privilege RLS, payment idempotency, seed data, and automated RLS/constraint tests. |
-| **B. App platform & domain logic** | `feat/platform-domain` | Vitest test stack, GitHub Actions CI (lint, typecheck, test, build), Node version pin, validated env config, server-only and browser Supabase clients, and fully tested domain modules: money (fils), deposits, order/catering/payment state machines, commission calculation, cart totals. |
-| **C. Bilingual storefront** | `feat/i18n-storefront` | `/[lang]` routing (ar RTL / en LTR) with `proxy.ts` detection, dictionaries, language switcher, mobile navigation, accessibility fixes, working tel/WhatsApp/Maps links, separate menu / catering / contact pages, SEO (metadata, hreflang, sitemap, robots, Restaurant JSON-LD), `/admin` removed from public nav and set `noindex`. |
+| #1 ✅ merged | Builds no longer depend on Google Fonts | — |
+| #2 | Secure database: versioned migrations, full data model, least-privilege RLS, audit trail | DB |
+| #3 | Business rules (money, deposits, statuses, commission, guest checkout and catering validation), payment webhook logic, confirmation email templates (ar/en), CI | Unit |
+| #4 | Arabic-first bilingual website: home, menu, catering, visit us, privacy; local SEO; accessibility | Unit |
+| #5 | Catering requests saved online (atomic, server-only) plus end-to-end tests | DB + E2E |
+| #6 | Fixes from the independent security review: 1 High, 4 Medium, 3 Low | DB + Unit |
 
-### Phase 2 — Core workflows
-1. Admin authentication (Supabase Auth, server-verified admin role, protected `/admin`).
-2. Catering request submission (server-validated, blocked dates, duplicate protection) → staff review → quote → deposit setup.
-3. Database-backed catalog + admin menu/package/category management (images in Supabase Storage).
-4. Cart and authoritative server-side order creation.
+**Checks on every PR:**
+- Database: 139 tests.
+- Unit: 219 tests, with 100% coverage of business rules.
+- End-to-end: 40 checks, on desktop and mobile.
+- Lint, typecheck and build.
 
-### Phase 3 — Money
-5. Payment requests, hosted checkout via the provider interface, verified idempotent webhook, deposit/remaining balance tracking.
-6. Refunds and cancellations; commission records and the commission report.
+## 2. P0 requirements — status
 
-### Phase 4 — Launch readiness
-7. Notifications (once the email provider is chosen), GA4 funnels, Google Business Profile/Search Console, performance budget, accessibility audit, Arabic content review, privacy policy, backups/restore drill, staging deployment — all requiring owner sign-off.
+✅ = implemented and tested · 🟡 = partly done · ⬜ = not started · 🔒 = blocked on an owner decision or account
 
-## 5. What we need from the owner
+| PRD | Requirement | Status |
+|---|---|---|
+| P0-F001 | Bilingual site, native RTL, language switch | ✅ (Arabic copy needs native review) |
+| P0-F002 | Menu and catering catalog | 🟡 Public pages use placeholder data identical to the DB seed; reading from the DB and admin catalog management are next |
+| P0-F003 | Structured catering request, validation, *Pending Review* | ✅ Saved online with reference and queued email |
+| P0-F004 | Cart and guest checkout for regular orders | 🟡 Server rules, DB function and tests are done; cart/checkout screens are not built |
+| P0-F005 | Admin order and status management | 🟡 DB rules and permissions are done; staff sign-in and dashboard are next |
+| P0-F006 | Online payment (UAE gateway), verified webhooks | 🟡🔒 Provider-agnostic design, mock provider and tested webhook logic are done; **real gateway not chosen** |
+| P0-F007 | Admin-chosen deposit (none / fixed / % / full) | 🟡 Rules and DB constraints are done; admin screen and payment links are next |
+| P0-F008 | Payment, deposit, remaining-balance and refund tracking | 🟡 Data model and rules are done; admin views are next |
+| P0-F009 | Website attribution, immutable source | ✅ |
+| P0-F010 | Configurable commission and records | 🟡🔒 Calculation, versioning and permissions are done; **rate/basis not decided**; report screen is next |
+| P0-F011 | Google Maps, directions, Google Business Profile | 🟡🔒 Maps and directions links are done; **GBP account and real address needed** |
+| P0-F012 | Local SEO | ✅ Technical SEO done · 🔒 Search Console account needed |
+| P0-F013 | WhatsApp and phone CTAs | ✅ (placeholder numbers) |
+| Owner §3 | Confirmation emails | 🟡🔒 Templates and queue are done; **email provider not chosen** |
+| Owner §2 | Security | ✅ Reviewed independently; CAPTCHA and per-IP limit recommended before launch |
 
-1. Payment gateway choice and sandbox credentials.
-2. Commission rate, basis and refund/cancellation treatment.
-3. Real business details: address, phone, WhatsApp number, opening hours, map location.
-4. Approved bilingual menu, prices, photos and catering packages.
-5. Delivery/pickup model, service area and catering lead time/capacity.
-6. VAT handling, refund/cancellation policy, privacy/retention policy.
-7. Supabase and Vercel projects for development/staging (and who owns production).
+## 3. Remaining build work, in order
+
+1. **Staff sign-in and admin dashboard.** Supabase Auth, staff roles, and a list and detail view for catering requests (review, quote, choose the deposit, change status) and orders.
+2. **Payment links for catering.** Create a payment request from the deposit choice, a hosted checkout (mock until the gateway is chosen), the webhook route and the payment-status updates.
+3. **Cart and guest checkout screens.** Regular orders, with online payment through the same flow.
+4. **Catalog from the database, plus admin menu management** (images in Supabase Storage).
+5. **Commission records and report** for the operations owner.
+6. **Email delivery worker** for the chosen provider, and marketing double opt-in confirmation.
+7. **Launch readiness:**
+   - Staging deployment.
+   - Backups and a restore drill.
+   - Monitoring.
+   - CAPTCHA and per-IP limits.
+   - Performance and accessibility audit.
+   - GA4.
+   - Search Console and Google Business Profile.
+
+Steps 1–5 are pure engineering. My estimate is about 2 to 2.5 weeks, building in the same tested, reviewed way.
+
+## 4. Timeline assessment (for approval — the deadline has not been changed)
+
+**The engineering can fit in the remaining weeks. The main risks are outside the code:**
+
+| Risk | Why it matters | What would de-risk it |
+|---|---|---|
+| **Payment gateway** (highest) | UAE merchant onboarding (KYC, trade licence, bank account) often takes 2–4 weeks before sandbox and live keys | Choose the gateway **this week** and start onboarding now; we keep building against the mock |
+| Email provider | Needed for confirmations | Pick one (e.g. Resend, Postmark, Amazon SES); setup takes about 1 day plus domain DNS records |
+| Commission terms | Needed before any commission record is created | Decide rate, basis (gross / collected / net of refunds) and refund/cancellation treatment |
+| Real content | Menu, prices, photos, address, hours, phone numbers | Send these to the team; Arabic copy needs a native reviewer |
+| Google Business Profile | Verification can take days to weeks (PRD R002) | Start verification now; it must not block launch |
+| Legal and privacy | UAE data-protection review of the privacy notice | Engage a reviewer before launch |
+| Supabase and Vercel projects | Needed for staging | Create projects under the business's ownership; turn off public sign-ups |
+
+**Options if the gateway is late (for your decision):**
+- **A.** Launch on time with online catering requests, admin, menu and SEO. Online payment and checkout go live as soon as the gateway is approved. Deposits are collected offline in the meantime and recorded by staff.
+- **B.** Keep payments in the launch scope and move the launch date to gateway approval.
+
+I recommend deciding between these once the gateway onboarding timeline is known.
+
+## 5. Working decisions taken (reversible)
+
+**Approved by you (2026-10-09):**
+- Guest checkout.
+- Arabic as the default language.
+- A mock payment provider during development.
+
+**Pending your approval:**
+- Catering lead time of 48 hours.
+- Delivery fee of 0 until a policy is set.
+- Cancelled orders earn no commission (as the PRD says).
+- Double opt-in for marketing emails.
+- A strict order-status flow.
+- Restaurant admins cannot see commission figures.
+- The operations owner has read-only access to operations.
+- VAT handling (not in the PRD).
