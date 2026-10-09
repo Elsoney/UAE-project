@@ -220,3 +220,32 @@ describe("guest catering requests", () => {
     expect(db.consentEvents).toEqual([{ customerId: "cust-1", granted: true, source: "catering_form" }]);
   });
 });
+
+describe("rules re-checked by the database", () => {
+  it("maps catering rejections to localised field errors or a rate limit", async () => {
+    db.rejectNext = "date_blocked";
+    expect(await submitCateringRequest(deps, catering())).toEqual({ ok: false, kind: "validation", errors: { eventDate: "errors.dateBlocked" } });
+    db.rejectNext = "date_past";
+    expect(await submitCateringRequest(deps, catering())).toEqual({ ok: false, kind: "validation", errors: { eventDate: "errors.datePast" } });
+    db.rejectNext = "package_unavailable";
+    expect(await submitCateringRequest(deps, catering())).toEqual({ ok: false, kind: "validation", errors: { packageId: "errors.packageUnavailable" } });
+    db.rejectNext = "rate_limited";
+    expect(await submitCateringRequest(deps, catering())).toEqual({ ok: false, kind: "rate_limited" });
+    expect(db.catering).toHaveLength(0);
+  });
+
+  it("maps order rejections: price changed, item gone, rate limited", async () => {
+    db.rejectNext = "price_changed";
+    expect(await submitGuestOrder(deps, order())).toEqual({ ok: false, kind: "price_changed" });
+    db.rejectNext = "item_unavailable";
+    expect(await submitGuestOrder(deps, order())).toMatchObject({ ok: false, kind: "cart" });
+    db.rejectNext = "rate_limited";
+    expect(await submitGuestOrder(deps, order())).toEqual({ ok: false, kind: "rate_limited" });
+    expect(db.orders).toHaveLength(0);
+  });
+
+  it("re-throws unexpected storage errors for catering", async () => {
+    db.failNextWrite = true;
+    await expect(submitCateringRequest(deps, catering())).rejects.toThrow("simulated database failure");
+  });
+});

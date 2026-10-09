@@ -5,15 +5,17 @@
  */
 import type { CatalogItem } from "@/lib/domain/cart";
 import type { ExistingCustomer } from "@/lib/domain/customer";
-import type {
-  CatalogPort,
-  CateringPackageInfo,
-  CustomerPort,
-  NewCateringRequest,
-  NewOrder,
-  SubmissionPort,
-  SubmittedCateringRequest,
-  SubmittedOrder,
+import {
+  SubmissionRejected,
+  type RejectionCode,
+  type CatalogPort,
+  type CateringPackageInfo,
+  type CustomerPort,
+  type NewCateringRequest,
+  type NewOrder,
+  type SubmissionPort,
+  type SubmittedCateringRequest,
+  type SubmittedOrder,
 } from "../ports";
 
 export type MemoryCustomer = {
@@ -37,6 +39,8 @@ export class MemoryDatabase implements CatalogPort, CustomerPort, SubmissionPort
   outbox: { template: string; toEmail: string; subject: string; locale: string; customerId: string }[] = [];
   /** Fail the next write (to prove atomicity). */
   failNextWrite = false;
+  /** Make the next write rejected by a database business rule. */
+  rejectNext: RejectionCode | null = null;
 
   async menuItems(ids: readonly string[]) {
     return new Map(ids.filter((id) => this.menu.has(id)).map((id) => [id, this.menu.get(id)!]));
@@ -77,6 +81,11 @@ export class MemoryDatabase implements CatalogPort, CustomerPort, SubmissionPort
   }
 
   private guardWrite() {
+    if (this.rejectNext) {
+      const code = this.rejectNext;
+      this.rejectNext = null;
+      throw new SubmissionRejected(code);
+    }
     if (this.failNextWrite) {
       this.failNextWrite = false;
       throw new Error("simulated database failure");

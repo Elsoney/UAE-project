@@ -19,7 +19,15 @@ import { generateReference } from "@/lib/domain/reference";
 import type { CateringStatus, OrderStatus, PaymentStatus } from "@/lib/domain/status";
 import { fieldErrors, type ValidationMessageKey } from "@/lib/domain/validation";
 import { type Brand, renderEmail } from "@/lib/notifications/templates";
-import type { CatalogPort, Clock, CustomerPort, SubmissionPort } from "./ports";
+import {
+  SubmissionRejected,
+  type CatalogPort,
+  type Clock,
+  type CustomerPort,
+  type SubmissionPort,
+  type SubmittedCateringRequest,
+  type SubmittedOrder,
+} from "./ports";
 
 export type SubmissionDeps = {
   catalog: CatalogPort;
@@ -33,15 +41,19 @@ export type SubmissionDeps = {
 };
 
 export type ValidationFailure = { ok: false; kind: "validation"; errors: Record<string, ValidationMessageKey> };
+export type RateLimited = { ok: false; kind: "rate_limited" };
 
 export type OrderSubmissionResult =
   | { ok: true; duplicate: boolean; reference: string; orderStatus: OrderStatus; paymentStatus: PaymentStatus; totalFils: Fils }
   | ValidationFailure
-  | { ok: false; kind: "cart"; issues: CartIssue[] };
+  | RateLimited
+  | { ok: false; kind: "cart"; issues: CartIssue[] }
+  | { ok: false; kind: "price_changed" };
 
 export type CateringSubmissionResult =
   | { ok: true; duplicate: boolean; reference: string; status: CateringStatus }
-  | ValidationFailure;
+  | ValidationFailure
+  | RateLimited;
 
 export async function submitGuestOrder(deps: SubmissionDeps, rawInput: unknown): Promise<OrderSubmissionResult> {
   const parsed = checkoutSchema.safeParse(rawInput);
@@ -81,7 +93,9 @@ export async function submitGuestOrder(deps: SubmissionDeps, rawInput: unknown):
     deps.brand,
   );
 
-  const created = await deps.submissions.createOrder({
+  let created: SubmittedOrder;
+  try {
+    created = await deps.submissions.createOrder({
     reference,
     idempotencyKey: input.idempotencyKey,
     customer: resolution.customer,
@@ -97,7 +111,14 @@ export async function submitGuestOrder(deps: SubmissionDeps, rawInput: unknown):
     deliveryFeeFils: cart.deliveryFeeFils,
     totalFils: cart.totalFils,
     email: { template: "order_received", locale: input.locale, toEmail: input.email.trim(), subject },
-  });
+    });
+  } catch (error) {
+    if (!(error instanceof SubmissionRejected)) throw error;
+    if (error.code === "rate_limited") return { ok: false, kind: "rate_limited" };
+    if (error.code === "price_changed") return { ok: false, kind: "price_changed" };
+    // item_unavailable: the catalog changed between pricing and saving.
+    return { ok: false, kind: "cart", issues: input.items.map((i) => ({ menuItemId: i.menuItemId, code: "unavailable" as const })) };
+  }
 
   return { ok: true, duplicate: false, ...created };
 }
@@ -150,7 +171,9 @@ export async function submitCateringRequest(
     deps.brand,
   );
 
-  const created = await deps.submissions.createCateringRequest({
+  let created: SubmittedCateringRequest;
+  try {
+    created = await deps.submissions.createCateringRequest({
     reference,
     idempotencyKey: input.idempotencyKey ?? null,
     customer: resolution.customer,
@@ -165,7 +188,20 @@ export async function submitCateringRequest(
     customRequest: input.customRequest,
     notes: input.notes,
     email: { template: "catering_request_received", locale: input.locale, toEmail: input.email.trim(), subject },
-  });
+    });
+  } catch (error) {
+    if (!(error instanceof SubmissionRejected)) throw error;
+    switch (error.code) {
+      case "rate_limited":
+        return { ok: false, kind: "rate_limited" };
+      case "date_blocked":
+        return { ok: false, kind: "validation", errors: { eventDate: "errors.dateBlocked" } };
+      case "date_past":
+        return { ok: false, kind: "validation", errors: { eventDate: "errors.datePast" } };
+      default:
+        return { ok: false, kind: "validation", errors: { packageId: "errors.packageUnavailable" } };
+    }
+  }
 
   return { ok: true, duplicate: false, ...created };
 }

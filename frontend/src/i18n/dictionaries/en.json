@@ -115,7 +115,16 @@
     "onlineSoonBody": "Online requests open soon. For now, send these details to us on WhatsApp. This does not book the date yet; we will call you to confirm.",
     "sendOnWhatsapp": "Send on WhatsApp",
     "editDetails": "Edit details",
-    "whatsappIntro": "Hello Umodai, I would like to request catering:"
+    "whatsappIntro": "Hello Umodai, I would like to request catering:",
+    "sending": "Sending…",
+    "receivedTitle": "Request received",
+    "receivedReference": "Your reference: {reference}",
+    "receivedBody": "This is not a booking confirmation yet. Our team will review your request and call you to confirm availability and agree the price. Your booking is confirmed only after that.",
+    "receivedEmail": "We will email a copy of your request to {email}.",
+    "newRequest": "Send another request",
+    "rateLimited": "We have received several requests from this email in the last hour. Please call us, or try again later.",
+    "submitError": "Your request could not be sent. Please try again, or call us or message us on WhatsApp.",
+    "honeypot": "Leave this field empty"
   },
   "contact": {
     "title": "Visit us",
