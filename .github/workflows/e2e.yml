@@ -1,0 +1,66 @@
+name: End-to-end
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  journeys:
+    name: Customer journeys (browser → Next.js → PostgREST → PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      POSTGREST_VERSION: v13.0.7
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            supabase/package-lock.json
+            e2e/package-lock.json
+
+      - name: Install
+        run: |
+          (cd supabase && npm ci)
+          (cd frontend && npm ci)
+          (cd e2e && npm ci)
+
+      - name: Download PostgREST
+        run: |
+          curl -sSfL -o /tmp/pgrst.tar.xz \
+            "https://github.com/PostgREST/postgrest/releases/download/${POSTGREST_VERSION}/postgrest-${POSTGREST_VERSION}-linux-static-x86-64.tar.xz"
+          tar -xf /tmp/pgrst.tar.xz -C /tmp
+          echo "POSTGREST_BIN=/tmp/postgrest" >> "$GITHUB_ENV"
+
+      - name: Install Chromium
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Type-check
+        working-directory: e2e
+        run: npm run typecheck
+
+      - name: Run journeys
+        working-directory: e2e
+        run: npm test
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7
