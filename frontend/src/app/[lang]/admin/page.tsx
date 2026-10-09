@@ -1,73 +1,107 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Suspense } from "react";
+import { StaffGate, StaffLoading } from "@/components/admin/staff-shell";
+import { StatusBadge } from "@/components/admin/status-badge";
+import type { Locale } from "@/i18n/config";
+import type { Dictionary } from "@/i18n/dictionary";
+import { formatAed } from "@/lib/domain/money";
+import { listCateringRequests, type CateringFilter } from "@/lib/services/staff-data";
 import { resolveLocale } from "../locale";
 
-/*
- * Staff area PREVIEW with sample data only. Real sign-in (Supabase Auth +
- * server-side role checks) and live data replace this in the admin release.
- * Not linked publicly and excluded from search engines.
- */
+export const metadata: Metadata = { title: "Umodai staff", robots: { index: false, follow: false } };
 
-export const metadata: Metadata = {
-  title: "Umodai staff",
-  robots: { index: false, follow: false },
-};
-
-const metrics = [
-  { label: "Open orders", value: "12" },
-  { label: "Pending catering", value: "4" },
-  { label: "Payments cleared", value: "96%" },
-  { label: "Commission pending", value: "AED 1,420" },
-];
-
-const recentOrders = [
-  { id: "ORD-1042", customer: "Sample A.", total: "AED 168", status: "Confirmed" },
-  { id: "ORD-1047", customer: "Sample B.", total: "AED 96", status: "Preparing" },
-  { id: "CET-330", customer: "Sample event", total: "AED 850", status: "Deposit pending" },
-];
-
-export default async function AdminPreviewPage({ params }: PageProps<"/[lang]/admin">) {
-  const { dict } = await resolveLocale(params);
+export default async function StaffCateringPage({ params, searchParams }: PageProps<"/[lang]/admin">) {
+  const { locale, dict } = await resolveLocale(params);
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6" dir="ltr" lang="en">
-      <p role="note" className="mb-8 border-s-4 border-saffron bg-plaster-deep p-4 font-semibold" dir="auto">
-        {dict.admin.previewBanner}
-      </p>
-      <h1 className="font-display text-3xl">Umodai operations</h1>
+    <Suspense fallback={<StaffLoading label={dict.staff.loading} />}>
+      <CateringList locale={locale} t={dict.staff} searchParams={searchParams} />
+    </Suspense>
+  );
+}
 
-      <section className="mt-6 grid gap-4 md:grid-cols-4">
-        {metrics.map((item) => (
-          <div key={item.label} className="border-2 border-rule bg-white p-5">
-            <p className="text-sm text-date">{item.label}</p>
-            <p className="mt-3 text-3xl font-bold">{item.value}</p>
-          </div>
-        ))}
-      </section>
-
-      <section className="mt-8 border-2 border-rule bg-white p-6">
-        <h2 className="text-xl font-semibold">Recent activity</h2>
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-start text-sm">
-            <thead>
-              <tr className="border-b border-rule text-date">
-                <th className="pb-3 pe-4 text-start font-medium">Reference</th>
-                <th className="pb-3 pe-4 text-start font-medium">Customer</th>
-                <th className="pb-3 pe-4 text-start font-medium">Total</th>
-                <th className="pb-3 pe-4 text-start font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentOrders.map((order) => (
-                <tr key={order.id} className="border-b border-rule/50 last:border-0">
-                  <td className="py-3 pe-4 font-medium">{order.id}</td>
-                  <td className="py-3 pe-4">{order.customer}</td>
-                  <td className="py-3 pe-4">{order.total}</td>
-                  <td className="py-3 pe-4">{order.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
+async function CateringList({
+  locale,
+  t,
+  searchParams,
+}: {
+  locale: Locale;
+  t: Dictionary["staff"];
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const filter: CateringFilter = (await searchParams).show === "all" ? "all" : "open";
+  return (
+    <StaffGate locale={locale} t={t} current="catering">
+      {async () => {
+        const rows = await listCateringRequests(filter);
+        const chip = (value: CateringFilter, label: string) => (
+          <Link
+            href={value === "open" ? `/${locale}/admin` : `/${locale}/admin?show=all`}
+            aria-current={filter === value ? "page" : undefined}
+            className={`min-h-11 rounded-full border-2 px-4 py-2 font-semibold ${filter === value ? "border-madder bg-madder text-plaster" : "border-rule"}`}
+          >
+            {label}
+          </Link>
+        );
+        return (
+          <section aria-labelledby="catering-heading">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <h1 id="catering-heading" className="font-display text-3xl text-indigo">
+                {t.navCatering}
+              </h1>
+              <div role="group" aria-label={t.filterLabel} className="flex gap-2">
+                {chip("open", t.filterOpen)}
+                {chip("all", t.filterAll)}
+              </div>
+            </div>
+            {rows.length === 0 ? (
+              <p className="mt-10 text-date">{t.empty}</p>
+            ) : (
+              <div className="mt-6 overflow-x-auto bg-white">
+                <table className="min-w-full text-start">
+                  <thead className="border-b-2 border-rule text-sm text-date">
+                    <tr>
+                      {[t.col.reference, t.col.customer, t.col.event, t.col.guests, t.col.total, t.col.status, t.col.payment].map((h) => (
+                        <th key={h} scope="col" className="px-4 py-3 text-start font-semibold">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.id} className="border-b border-rule/60 last:border-0">
+                        <td className="px-4 py-3">
+                          <Link href={`/${locale}/admin/catering/${r.id}`} className="tabular whitespace-nowrap font-semibold text-madder underline underline-offset-4" dir="ltr">
+                            {r.reference}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3">{r.contact_name}</td>
+                        <td className="tabular px-4 py-3">
+                          <span dir="ltr" className="whitespace-nowrap">
+                            {r.event_date} {r.event_time.slice(0, 5)}
+                          </span>
+                          <span className="block text-sm text-date">
+                            {r.catering_packages ? (locale === "ar" ? r.catering_packages.name_ar : r.catering_packages.name_en) : t.customPackage}
+                          </span>
+                        </td>
+                        <td className="tabular px-4 py-3">{r.guest_count}</td>
+                        <td className="tabular px-4 py-3">{r.quoted_total_fils ? formatAed(r.quoted_total_fils, locale) : "—"}</td>
+                        <td className="px-4 py-3">
+                          <StatusBadge locale={locale} catering={r.status} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusBadge locale={locale} payment={r.payment_status} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        );
+      }}
+    </StaffGate>
   );
 }

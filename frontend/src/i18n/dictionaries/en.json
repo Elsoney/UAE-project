@@ -176,9 +176,6 @@
     "body": "Please try again. If it keeps happening, call us and we will help.",
     "retry": "Try again"
   },
-  "admin": {
-    "previewBanner": "Staff area preview — sample data only. Sign-in and live data arrive in the admin release."
-  },
   "privacy": {
     "title": "Privacy notice",
     "draft": "Draft — pending legal review under UAE data-protection law before launch.",
@@ -222,5 +219,107 @@
         ]
       }
     ]
+  },
+  "staff": {
+    "signInTitle": "Staff sign-in",
+    "signInLead": "For Umodai staff only. Use the account the restaurant created for you.",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "signInError": "The email or password is not correct.",
+    "signInUnavailable": "Sign-in is not available on this preview. The staff database is not connected.",
+    "notStaffTitle": "This account has no staff access",
+    "notStaffBody": "Ask the website & operations owner to give your account access, or sign in with a different account.",
+    "signOut": "Sign out",
+    "signedInAs": "Signed in as {name}",
+    "roles": {
+      "admin": "Restaurant admin",
+      "operations_owner": "Website & operations owner"
+    },
+    "navCatering": "Catering requests",
+    "navOrders": "Orders",
+    "readOnly": "You have read-only access to operations.",
+    "filterLabel": "Show",
+    "filterOpen": "Open",
+    "filterAll": "All",
+    "empty": "Nothing here yet.",
+    "loading": "Loading…",
+    "col": {
+      "reference": "Reference",
+      "customer": "Customer",
+      "event": "Event",
+      "guests": "Guests",
+      "status": "Status",
+      "payment": "Payment",
+      "total": "Total",
+      "received": "Received",
+      "items": "Items",
+      "type": "Type"
+    },
+    "back": "Back to catering requests",
+    "contact": "Contact",
+    "eventDetails": "Event",
+    "package": "Package",
+    "customPackage": "Custom request",
+    "customerNotes": "Customer notes",
+    "adminNotes": "Staff notes",
+    "saveNotes": "Save notes",
+    "history": "History",
+    "historyStatus": "Status: {from} → {to}",
+    "historyPayment": "Payment: {from} → {to}",
+    "historyCreated": "Received as {to}",
+    "nextSteps": "Next steps",
+    "markContacted": "Mark customer contacted",
+    "quoteTitle": "Agreed price and payment",
+    "quoteLead": "Enter the final price agreed with the customer and what they must pay before the booking is confirmed.",
+    "quoteTotal": "Agreed total (AED)",
+    "depositLabel": "Payment before confirmation",
+    "deposit": {
+      "none": "No deposit",
+      "fixed": "Fixed deposit (AED)",
+      "percentage": "Percentage deposit",
+      "full": "Full payment"
+    },
+    "depositFixedAmount": "Deposit amount (AED)",
+    "depositPercent": "Deposit percentage",
+    "saveQuote": "Save price and payment",
+    "requiredNow": "Required before confirmation: {amount}",
+    "remaining": "Remaining after that: {amount}",
+    "confirmBooking": "Confirm booking",
+    "startPreparing": "Start preparing",
+    "markCompleted": "Mark completed",
+    "paymentLinksSoon": "Payment links will be available once the payment provider is set up. Until then, a booking that needs a deposit cannot be confirmed here.",
+    "rejectTitle": "Not possible",
+    "reject": "Decline request",
+    "cancelTitle": "Cancel",
+    "cancel": "Cancel booking",
+    "reason": "Reason (shared with the customer)",
+    "saved": "Saved.",
+    "orderSteps": {
+      "confirmed": "Confirm order",
+      "preparing": "Start preparing",
+      "ready": "Mark ready",
+      "completed": "Mark collected / delivered"
+    },
+    "cancelOrder": "Cancel order",
+    "pickup": "Pickup",
+    "delivery": "Delivery",
+    "errors": {
+      "invalid_input": "Something in the form is not right. Please check it.",
+      "invalid_amount": "Enter amounts in dirhams, like 1500 or 1500.50.",
+      "deposit_exceeds_total": "The deposit cannot be more than the agreed total.",
+      "deposit_invalid": "The percentage must be above 0 and at most 100.",
+      "invalid_transition": "This step is not possible from the current status.",
+      "quote_required": "Record the agreed price first.",
+      "deposit_choice_required": "Choose the payment required before confirmation first.",
+      "payment_not_received": "The required payment has not been received yet.",
+      "locked": "This booking can no longer be changed.",
+      "reason_required": "Please give a short reason.",
+      "date_unavailable": "That date is in the past or not available.",
+      "forbidden": "Your account cannot make this change.",
+      "not_found": "This record no longer exists.",
+      "failed": "The change could not be saved. Please try again."
+    }
   }
 }

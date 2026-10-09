@@ -24,6 +24,7 @@ create schema auth;
 create table auth.users (
   id uuid primary key,
   email text,
+  encrypted_password text,  -- used only by the end-to-end auth stand-in
   created_at timestamptz not null default now()
 );
 

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { otherLocale } from "@/i18n/config";
 import { business } from "@/config/business";
 import type { Locale } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/dictionary";
@@ -30,14 +32,41 @@ export function SiteHeader({ locale, dict }: { locale: Locale; dict: Dictionary 
           <span className="hidden text-sm text-date sm:inline">{business.tagline[locale]}</span>
         </Link>
         <nav aria-label={dict.nav.mainNavigation} className="hidden md:block">
-          <NavLinks items={items} className="flex items-center gap-7" />
+          {/* The current page is only known at request time on some routes. */}
+          <Suspense fallback={<StaticNav items={items} />}>
+            <NavLinks items={items} className="flex items-center gap-7" />
+          </Suspense>
         </nav>
         <div className="flex items-center gap-2">
-          <LanguageSwitcher locale={locale} label={dict.nav.switchLanguage} ariaLabel={dict.nav.switchLanguageLabel} />
-          <MobileNav items={items} openLabel={dict.nav.openMenu} closeLabel={dict.nav.closeMenu} navLabel={dict.nav.mainNavigation} />
+          <Suspense
+            fallback={
+              <Link href={`/${otherLocale(locale)}`} hrefLang={otherLocale(locale)} lang={otherLocale(locale)} className="inline-flex min-h-11 items-center rounded-full border-2 border-indigo/15 px-4 text-sm font-semibold">
+                {dict.nav.switchLanguage}
+              </Link>
+            }
+          >
+            <LanguageSwitcher locale={locale} label={dict.nav.switchLanguage} ariaLabel={dict.nav.switchLanguageLabel} />
+          </Suspense>
+          <Suspense fallback={null}>
+            <MobileNav items={items} openLabel={dict.nav.openMenu} closeLabel={dict.nav.closeMenu} navLabel={dict.nav.mainNavigation} />
+          </Suspense>
         </div>
       </div>
       <div className="sadu-band" aria-hidden="true" />
     </header>
+  );
+}
+
+function StaticNav({ items }: { items: NavItem[] }) {
+  return (
+    <ul className="flex items-center gap-7">
+      {items.map((item) => (
+        <li key={item.href}>
+          <Link href={item.href} className="inline-flex min-h-11 items-center px-1 font-semibold text-indigo hover:text-madder">
+            {item.label}
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

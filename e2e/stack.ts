@@ -69,8 +69,100 @@ async function waitFor(url: string, timeoutMs = 60_000) {
   }
 }
 
-function proxy(targetPort: number, port: number): Server {
+type AuthUser = { id: string; email: string; created_at: string };
+
+function verifyJwt(token: string): Record<string, unknown> | null {
+  const [h, p, sig] = token.split(".");
+  if (!h || !p || !sig) return null;
+  const expected = createHmac("sha256", JWT_SECRET).update(`${h}.${p}`).digest("base64url");
+  if (expected !== sig) return null;
+  const payload = JSON.parse(Buffer.from(p, "base64url").toString()) as Record<string, unknown>;
+  if (typeof payload.exp === "number" && payload.exp < Date.now() / 1000) return null;
+  return payload;
+}
+
+function userJson(u: AuthUser) {
+  return {
+    id: u.id,
+    aud: "authenticated",
+    role: "authenticated",
+    email: u.email,
+    email_confirmed_at: u.created_at,
+    app_metadata: { provider: "email", providers: ["email"] },
+    user_metadata: {},
+    identities: [],
+    created_at: u.created_at,
+    updated_at: u.created_at,
+  };
+}
+
+function session(u: AuthUser) {
+  const now = Math.floor(Date.now() / 1000);
+  return {
+    access_token: signJwt({ sub: u.id, role: "authenticated", aud: "authenticated", email: u.email, iat: now, exp: now + 3600 }),
+    token_type: "bearer",
+    expires_in: 3600,
+    expires_at: now + 3600,
+    refresh_token: `rt-${u.id}`,
+    user: userJson(u),
+  };
+}
+
+/**
+ * Minimal stand-in for Supabase Auth (GoTrue): password sign-in, refresh,
+ * current user and sign-out — enough to test staff sign-in end to end.
+ * Passwords are sha256 hashes in auth.users.encrypted_password (test only).
+ */
+async function handleAuth(databaseUrl: string, req: import("node:http").IncomingMessage, res: import("node:http").ServerResponse) {
+  const url = new URL(req.url ?? "/", "http://local");
+  const body = await new Promise<string>((resolve) => {
+    let data = "";
+    req.on("data", (c) => (data += c));
+    req.on("end", () => resolve(data));
+  });
+  const send = (status: number, json?: unknown) => {
+    res.writeHead(status, { "content-type": "application/json" });
+    res.end(json === undefined ? "" : JSON.stringify(json));
+  };
+  const db = new pg.Client({ connectionString: databaseUrl });
+  await db.connect();
+  try {
+    const find = async (where: string, params: unknown[]) =>
+      (await db.query<AuthUser>(`select id, email, created_at::text from auth.users where ${where}`, params)).rows[0];
+    const path = url.pathname.replace(/^\/auth\/v1/, "");
+    if (path === "/token" && req.method === "POST") {
+      const input = JSON.parse(body || "{}") as { email?: string; password?: string; refresh_token?: string };
+      let user: AuthUser | undefined;
+      if (url.searchParams.get("grant_type") === "password") {
+        user = await find("lower(email) = lower($1) and encrypted_password = encode(sha256(convert_to($2, 'UTF8')), 'hex')", [input.email, input.password]);
+      } else if (url.searchParams.get("grant_type") === "refresh_token" && input.refresh_token?.startsWith("rt-")) {
+        user = await find("id = $1::uuid", [input.refresh_token.slice(3)]);
+      }
+      if (!user) return send(400, { code: 400, error_code: "invalid_credentials", msg: "Invalid login credentials" });
+      return send(200, session(user));
+    }
+    if (path === "/user" && req.method === "GET") {
+      const claims = verifyJwt(String(req.headers.authorization ?? "").replace(/^Bearer /, ""));
+      const user = claims?.sub ? await find("id = $1::uuid", [claims.sub]) : undefined;
+      if (!user) return send(401, { code: 401, error_code: "bad_jwt", msg: "invalid JWT" });
+      return send(200, userJson(user));
+    }
+    if (path === "/logout") return send(204);
+    return send(404, { code: 404, msg: "not found" });
+  } finally {
+    await db.end();
+  }
+}
+
+function proxy(targetPort: number, port: number, databaseUrl: string): Server {
   return createServer((req, res) => {
+    if ((req.url ?? "").startsWith("/auth/v1/")) {
+      handleAuth(databaseUrl, req, res).catch(() => {
+        res.writeHead(500);
+        res.end();
+      });
+      return;
+    }
     const path = (req.url ?? "/").replace(/^\/rest\/v1/, "") || "/";
     const upstream = httpRequest(
       { host: "127.0.0.1", port: targetPort, path, method: req.method, headers: { ...req.headers, host: `127.0.0.1:${targetPort}` } },
@@ -133,7 +225,7 @@ export async function startStack(): Promise<Stack> {
   await waitFor(`http://127.0.0.1:${restPort}/`);
 
   const apiPort = freePort();
-  const api = proxy(restPort, apiPort);
+  const api = proxy(restPort, apiPort, databaseUrl);
   const apiUrl = `http://127.0.0.1:${apiPort}`;
 
   const sitePort = freePort();
