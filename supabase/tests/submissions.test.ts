@@ -112,14 +112,16 @@ describe("guest catering request", () => {
     expect(snapshots.map((s) => s.contact_name).sort()).toEqual(["Sara Ali", "Someone Else"]);
   });
 
-  it("records marketing consent only on opt-in, once", async () => {
+  it("records an opt-in request only when ticked, once, pending the email owner's confirmation", async () => {
     await submitCatering(catering({ marketing_consent: true }));
     await submitCatering(catering({ marketing_consent: true }));
     await submitCatering(catering({ marketing_consent: false }));
     await db().asOwner();
-    expect(await db().rows("select granted, source from public.consent_events")).toEqual([{ granted: true, source: "catering_form" }]);
+    expect(await db().rows("select granted, source, verified_at from public.consent_events")).toEqual([
+      { granted: true, source: "catering_form", verified_at: null },
+    ]);
     const [c] = await db().rows<{ marketing_consent: boolean }>("select marketing_consent from public.customers");
-    expect(c.marketing_consent).toBe(true);
+    expect(c.marketing_consent).toBe(false);
   });
 
   it("supports a custom request without a package", async () => {

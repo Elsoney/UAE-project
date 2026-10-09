@@ -9,15 +9,17 @@ const provider = new MockPaymentProvider({ webhookSecret: SECRET, siteUrl: "http
 
 class MemoryStore implements PaymentStore {
   events = new Map<string, { processedAt: boolean; error: string | null }>();
+  /** Make the next savePayment throw (simulates a crash mid-processing). */
+  failNextSave = false;
   requests = new Map<string, StoredPaymentRequest>();
-  payments = new Map<string, StoredPayment & { requestId: string; isTest: boolean }>();
+  payments = new Map<string, StoredPayment & { isTest: boolean }>();
   refunds = new Map<string, { paymentRef: string; amount: number; status: "pending" | "succeeded" | "failed" }>();
   statuses = new Map<string, string>();
 
   async recordEvent(e: VerifiedPaymentEvent) {
     const key = `${e.provider}:${e.eventId}`;
-    if (this.events.has(key)) return "duplicate" as const;
-    this.events.set(key, { processedAt: false, error: null });
+    if (this.events.get(key)?.processedAt) return "duplicate" as const;
+    if (!this.events.has(key)) this.events.set(key, { processedAt: false, error: null });
     return "new" as const;
   }
   async markEventProcessed(p: string, id: string, error: string | null) {
@@ -30,13 +32,18 @@ class MemoryStore implements PaymentStore {
     return this.payments.get(`${p}:${ref}`) ?? null;
   }
   async savePayment(input: Parameters<PaymentStore["savePayment"]>[0]) {
+    if (this.failNextSave) {
+      this.failNextSave = false;
+      throw new Error("database unavailable");
+    }
     const key = `${input.request.provider}:${input.providerReference}`;
     const existing = this.payments.get(key);
+    if (existing?.status === "succeeded") throw new Error("a succeeded payment cannot be changed");
     this.payments.set(key, {
       id: existing?.id ?? `pay-${this.payments.size + 1}`,
+      paymentRequestId: input.request.id,
       status: input.status,
       amountFils: input.amountFils,
-      requestId: input.request.id,
       isTest: input.isTest,
     });
   }
@@ -53,7 +60,7 @@ class MemoryStore implements PaymentStore {
   async paymentSummary(parent: PaymentParent) {
     const reqs = [...this.requests.values()].filter((r) => r.parent.id === parent.id);
     const ids = new Set(reqs.map((r) => r.id));
-    const pays = [...this.payments.entries()].filter(([, p]) => ids.has(p.requestId));
+    const pays = [...this.payments.entries()].filter(([, p]) => ids.has(p.paymentRequestId));
     const paid = pays.filter(([, p]) => p.status === "succeeded").reduce((s, [, p]) => s + p.amountFils, 0);
     const refunded = [...this.refunds.values()].filter((r) => r.status === "succeeded").reduce((s, r) => s + r.amount, 0);
     const last = pays.at(-1)?.[1];
@@ -213,14 +220,66 @@ describe("payment webhook", () => {
     expect(
       await handlePaymentWebhook({ provider, store, ...event({ id: "evt-5", type: "refund.succeeded" }) }),
     ).toMatchObject({ outcome: "needs_review", reason: "refund event without refund id" });
-    store.refunds.set("re-2", { paymentRef: "txn-1", amount: 1, status: "pending" });
+    // A refund event for a payment we never recorded is flagged.
     expect(
       await handlePaymentWebhook({
         provider,
         store,
-        ...event({ id: "evt-6", type: "refund.succeeded", data: { refund_id: "re-2", payment_request_id: "gone" } }),
+        ...event({ id: "evt-6", type: "refund.succeeded", data: { refund_id: "re-2", transaction_id: "unknown-txn" } }),
       }),
-    ).toMatchObject({ outcome: "ignored" });
+    ).toMatchObject({ outcome: "needs_review", reason: "refund for unknown payment" });
+  });
+
+  it("reprocesses an event whose processing crashed, so the payment is not lost", async () => {
+    const store = setup();
+    store.failNextSave = true;
+    await expect(handlePaymentWebhook({ provider, store, ...event() })).rejects.toThrow("database unavailable");
+    expect(store.payments.size).toBe(0);
+    // The provider retries the same event: it is processed now, not treated as a duplicate.
+    expect(await handlePaymentWebhook({ provider, store, ...event() })).toMatchObject({ outcome: "processed", paymentStatus: "deposit_paid" });
+    expect(store.payments.get("mock:txn-1")?.status).toBe("succeeded");
+  });
+
+  it.each(["superseded", "cancelled", "expired"] as const)("flags money paid against a %s request for review", async (status) => {
+    const store = setup();
+    store.requests.set("req-1", { ...store.requests.get("req-1")!, status });
+    expect(await handlePaymentWebhook({ provider, store, ...event() })).toMatchObject({ outcome: "needs_review" });
+    expect(store.payments.size).toBe(0);
+    expect(await handlePaymentWebhook({ provider, store, ...event({ id: "evt-f", type: "payment.failed" }) })).toMatchObject({ outcome: "ignored" });
+  });
+
+  it("applies a refund to the order that owns the payment, whatever the event claims", async () => {
+    const store = setup();
+    store.requests.set("req-other", { ...store.requests.get("req-1")!, id: "req-other", parent: { kind: "order", id: "victim-order" } });
+    await handlePaymentWebhook({ provider, store, ...event() });
+    store.refunds.set("re-9", { paymentRef: "txn-1", amount: 1000, status: "pending" });
+    const result = await handlePaymentWebhook({
+      provider,
+      store,
+      ...event({ id: "evt-r", type: "refund.succeeded", data: { refund_id: "re-9", payment_request_id: "req-other", amount_fils: 1000 } }),
+    });
+    expect(result).toMatchObject({ outcome: "processed", parent: { kind: "catering_request", id: "cat-1" } });
+    expect(store.statuses.has("victim-order")).toBe(false);
+  });
+
+  it("rejects a refund whose test/live mode does not match the payment", async () => {
+    const store = setup();
+    await handlePaymentWebhook({ provider, store, ...event() });
+    store.requests.set("req-1", { ...store.requests.get("req-1")!, isTest: false });
+    store.refunds.set("re-1", { paymentRef: "txn-1", amount: 1000, status: "pending" });
+    expect(
+      await handlePaymentWebhook({ provider, store, ...event({ id: "evt-m", type: "refund.succeeded", data: { refund_id: "re-1" } }) }),
+    ).toMatchObject({ outcome: "needs_review", reason: "refund does not match its payment" });
+    expect(store.refunds.get("re-1")?.status).toBe("pending");
+  });
+
+  it("never marks a closed request as paid when a retried success arrives after supersession", async () => {
+    const store = setup();
+    await handlePaymentWebhook({ provider, store, ...event() });
+    store.requests.set("req-1", { ...store.requests.get("req-1")!, status: "superseded" });
+    const retry = await handlePaymentWebhook({ provider, store, ...event({ id: "evt-again" }) });
+    expect(retry).toMatchObject({ outcome: "processed" });
+    expect(store.requests.get("req-1")?.status).toBe("superseded");
   });
 
   it("re-throws unexpected provider errors", async () => {

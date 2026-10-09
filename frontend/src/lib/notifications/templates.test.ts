@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LogEmailSender } from "./email";
+import { LogEmailSender, maskEmail } from "./email";
 import { escapeHtml, renderEmail, type Brand, type EmailTemplate } from "./templates";
 
 const brand: Brand = { nameEn: "Umodai", nameAr: "أمودي", phone: "+971 6 000 0000", siteUrl: "https://umodai.example" };
@@ -154,7 +154,15 @@ describe("log email sender", () => {
     const result = await sender.send({ to: "a@example.com", subject: "Hi", text: "t", html: "h", locale: "en" });
     expect(result.providerMessageId).toBe("log-1");
     expect(sender.sent).toHaveLength(1);
-    expect(lines[0]).toContain("a@example.com");
+    expect(lines[0]).toContain("a***@example.com");
+    expect(lines[0]).not.toContain("a@example.com");
     await new LogEmailSender().send({ to: "b@example.com", subject: "x", text: "", html: "", locale: "ar" });
+  });
+});
+
+describe("maskEmail", () => {
+  it("hides the local part", () => {
+    expect(maskEmail("sara.ali@example.com")).toBe("s***@example.com");
+    expect(maskEmail("not-an-email")).toBe("***");
   });
 });

@@ -196,8 +196,16 @@ describe("customers and email (guest checkout)", () => {
       [customer.id],
     );
     expect(before.marketing_consent).toBe(false);
+    // An unverified opt-in (from a form) does not grant consent on its own.
     await db().query(
       "insert into public.consent_events (customer_id, consent_type, granted, source, locale) values ($1, 'marketing_email', true, 'catering_form', 'ar')",
+      [customer.id],
+    );
+    const [pending] = await db().rows<{ marketing_consent: boolean }>("select marketing_consent from public.customers where id = $1", [customer.id]);
+    expect(pending.marketing_consent).toBe(false);
+    // Confirmed by the email owner.
+    await db().query(
+      "insert into public.consent_events (customer_id, consent_type, granted, source, locale, verified_at) values ($1, 'marketing_email', true, 'catering_form', 'ar', now())",
       [customer.id],
     );
     const [after] = await db().rows<{ marketing_consent: boolean; marketing_consent_source: string }>(
@@ -487,6 +495,7 @@ describe("commissions", () => {
 
   it("finds the setting in force at a point in time", async () => {
     const id = await createCommissionSetting(db());
+    await db().as("service_role");
     const [row] = await db().rows<{ id: string | null }>("select (public.commission_setting_at(now())).id as id");
     expect(row.id).toBe(id);
     const [none] = await db().rows<{ id: string | null }>("select (public.commission_setting_at(now() - interval '30 days')).id as id");

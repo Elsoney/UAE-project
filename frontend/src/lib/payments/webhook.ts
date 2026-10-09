@@ -9,7 +9,10 @@
  *     event is flagged for manual review.
  *  4. Apply it idempotently: a success is recorded once; a late "failed"
  *     event never overrides a success (out-of-order delivery); a failure
- *     leaves the request open so the customer can retry.
+ *     leaves the request open so the customer can retry; money for a
+ *     superseded/cancelled/expired request is flagged for review. If
+ *     processing throws, the event stays unprocessed and the provider's retry
+ *     processes it again.
  *  5. Recompute the order/catering payment status from actual money movements.
  *
  * Storage is behind the PaymentStore interface so this logic is unit-tested
@@ -33,17 +36,32 @@ export type StoredPaymentRequest = {
 
 export type StoredPayment = {
   id: string;
+  paymentRequestId: string;
   status: "pending" | "succeeded" | "failed" | "cancelled";
   amountFils: Fils;
 };
 
+/**
+ * Storage for webhook processing. Implementations must run each event's
+ * processing in one database transaction holding a row lock on the
+ * payment_events row (SELECT ... FOR UPDATE), so two simultaneous deliveries
+ * of the same event are processed one after the other.
+ */
 export interface PaymentStore {
-  /** Inserts the event; returns "duplicate" if (provider, eventId) already exists. */
+  /**
+   * Inserts the event if new. Returns "duplicate" only when the same
+   * (provider, eventId) was already PROCESSED; an event that was recorded but
+   * whose processing failed returns "new" so the provider's retry reprocesses it.
+   */
   recordEvent(event: VerifiedPaymentEvent): Promise<"new" | "duplicate">;
   markEventProcessed(provider: string, eventId: string, error: string | null): Promise<void>;
   findPaymentRequest(id: string): Promise<StoredPaymentRequest | null>;
   findPayment(provider: string, providerReference: string): Promise<StoredPayment | null>;
-  /** Inserts or updates the payment identified by (provider, providerReference). */
+  /**
+   * Inserts or updates the payment identified by (provider, providerReference).
+   * Must never change a payment that already succeeded (the database enforces
+   * this too), so concurrent or late events cannot downgrade it.
+   */
   savePayment(input: {
     request: StoredPaymentRequest;
     providerReference: string;
@@ -106,6 +124,18 @@ export async function handlePaymentWebhook(input: {
     if (!event.refundReference) {
       return finish({ outcome: "needs_review", httpStatus: 200, reason: "refund event without refund id" }, "missing refund id");
     }
+    // The refunded payment (not the event's claim) decides which order is affected.
+    const payment = await store.findPayment(event.provider, event.providerReference);
+    if (!payment) {
+      return finish({ outcome: "needs_review", httpStatus: 200, reason: "refund for unknown payment" }, "unknown payment");
+    }
+    const owner = await store.findPaymentRequest(payment.paymentRequestId);
+    if (!owner || owner.provider !== event.provider || owner.isTest !== event.isTest) {
+      return finish(
+        { outcome: "needs_review", httpStatus: 200, reason: "refund does not match its payment" },
+        "refund mismatch",
+      );
+    }
     const updated = await store.updateRefundStatus(
       event.providerReference,
       event.refundReference,
@@ -114,10 +144,8 @@ export async function handlePaymentWebhook(input: {
     if (!updated) {
       return finish({ outcome: "needs_review", httpStatus: 200, reason: "unknown refund" }, "unknown refund");
     }
-    const request = await store.findPaymentRequest(event.paymentRequestId);
-    if (!request) return finish({ outcome: "ignored", httpStatus: 200, reason: "unknown payment request" }, "unknown payment request");
-    const status = await refreshStatus(store, request.parent, request.isTest);
-    return finish({ outcome: "processed", httpStatus: 200, paymentStatus: status, parent: request.parent, event });
+    const status = await refreshStatus(store, owner.parent, owner.isTest);
+    return finish({ outcome: "processed", httpStatus: 200, paymentStatus: status, parent: owner.parent, event });
   }
 
   const request = await store.findPaymentRequest(event.paymentRequestId);
@@ -132,8 +160,16 @@ export async function handlePaymentWebhook(input: {
   }
 
   const existing = await store.findPayment(event.provider, event.providerReference);
+  const closed = request.status === "superseded" || request.status === "cancelled" || request.status === "expired";
 
   if (event.type === "payment.succeeded") {
+    if (closed && existing?.status !== "succeeded") {
+      // Money arrived for a request that is no longer valid (e.g. the price changed).
+      return finish(
+        { outcome: "needs_review", httpStatus: 200, reason: `payment for a ${request.status} payment request` },
+        "payment for closed request",
+      );
+    }
     if (event.currency !== request.currency || event.amountFils !== request.requestedAmountFils) {
       return finish(
         { outcome: "needs_review", httpStatus: 200, reason: "amount or currency does not match the payment request" },
@@ -152,11 +188,15 @@ export async function handlePaymentWebhook(input: {
         metadata: event.metadata,
       });
     }
-    if (request.status !== "paid") await store.markRequestPaid(request.id);
+    // Only an open request becomes paid (a closed one keeps its status for review).
+    if (request.status === "pending" || request.status === "failed") await store.markRequestPaid(request.id);
   } else {
     // payment.failed — never downgrade a payment that already succeeded.
     if (existing?.status === "succeeded") {
       return finish({ outcome: "ignored", httpStatus: 200, reason: "late failure after success" });
+    }
+    if (closed) {
+      return finish({ outcome: "ignored", httpStatus: 200, reason: `failure for a ${request.status} payment request` });
     }
     await store.savePayment({
       request,

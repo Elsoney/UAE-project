@@ -28,7 +28,15 @@ export class LogEmailSender implements EmailSender {
 
   async send(email: OutgoingEmail) {
     this.sent.push(email);
-    this.log(`[email:log] to=${email.to} subject=${JSON.stringify(email.subject)}`);
+    // Never write full email addresses to logs.
+    this.log(`[email:log] to=${maskEmail(email.to)} subject=${JSON.stringify(email.subject)}`);
     return { providerMessageId: `log-${this.sent.length}` };
   }
+}
+
+/** "sara.ali@example.com" -> "s***@example.com" */
+export function maskEmail(address: string): string {
+  const at = address.lastIndexOf("@");
+  if (at <= 0) return "***";
+  return `${address[0]}***${address.slice(at)}`;
 }
