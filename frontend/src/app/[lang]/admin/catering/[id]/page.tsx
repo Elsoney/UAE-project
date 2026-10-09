@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import { formatPhone } from "@/config/business";
 import type { Locale } from "@/i18n/config";
 import { interpolate, type Dictionary } from "@/i18n/dictionary";
+import { formatAed } from "@/lib/domain/money";
 import { cateringStatusLabel, paymentStatusLabel, type CateringStatus, type PaymentStatus } from "@/lib/domain/status";
 import { getCateringRequest } from "@/lib/services/staff-data";
 import { resolveRootLocale } from "../../../locale";
@@ -29,7 +30,8 @@ async function Detail({ locale, t, params }: { locale: Locale; t: Dictionary["st
       {async (session) => {
         const found = /^[0-9a-f-]{36}$/i.test(id) ? await getCateringRequest(id) : null;
         if (!found) return <p className="text-date">{t.errors.not_found}</p>;
-        const { request: r, history } = found;
+        const { request: r, history, paymentRequests, payments } = found;
+        const open = paymentRequests.find((p) => p.status === "pending") ?? null;
         const pkg = r.catering_packages;
         const label = (field: string, value: string | null) =>
           value === null ? "" : field === "status" ? cateringStatusLabel(value as CateringStatus, locale) : paymentStatusLabel(value as PaymentStatus, locale);
@@ -90,6 +92,25 @@ async function Detail({ locale, t, params }: { locale: Locale; t: Dictionary["st
                   {r.cancellation_reason && <p className="mt-4 font-semibold text-madder">{r.cancellation_reason}</p>}
                 </section>
 
+                {payments.length > 0 && (
+                  <section aria-labelledby="payments-h" className="bg-white p-5">
+                    <h2 id="payments-h" className="font-display text-xl text-madder">
+                      {t.paymentsReceived}
+                    </h2>
+                    <ul className="mt-2 flex flex-col gap-1">
+                      {payments.map((p) => (
+                        <li key={p.id} className="tabular">
+                          {formatAed(p.amount_fils, locale)}{" "}
+                          <span className="text-sm text-date" dir="ltr">
+                            {p.paid_at?.slice(0, 16).replace("T", " ")}
+                            {p.is_test ? " · TEST" : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
                 <section aria-labelledby="history-h">
                   <h2 id="history-h" className="font-display text-xl text-indigo">
                     {t.history}
@@ -124,6 +145,8 @@ async function Detail({ locale, t, params }: { locale: Locale; t: Dictionary["st
                 depositFixedFils={r.deposit_fixed_fils}
                 adminNotes={r.admin_notes}
                 canEdit={session.role === "admin"}
+                openLink={open ? { url: open.checkout_url, amountFils: open.requested_amount_fils, expiresAt: open.expires_at } : null}
+                testMode={process.env.PAYMENT_PROVIDER === undefined || process.env.PAYMENT_PROVIDER === "mock"}
               />
             </div>
           </div>

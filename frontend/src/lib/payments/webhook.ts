@@ -52,8 +52,9 @@ export interface PaymentStore {
    * Inserts the event if new. Returns "duplicate" only when the same
    * (provider, eventId) was already PROCESSED; an event that was recorded but
    * whose processing failed returns "new" so the provider's retry reprocesses it.
+   * "busy" means another delivery of the same event is being processed right now.
    */
-  recordEvent(event: VerifiedPaymentEvent): Promise<"new" | "duplicate">;
+  recordEvent(event: VerifiedPaymentEvent): Promise<"new" | "duplicate" | "busy">;
   markEventProcessed(provider: string, eventId: string, error: string | null): Promise<void>;
   findPaymentRequest(id: string): Promise<StoredPaymentRequest | null>;
   findPayment(provider: string, providerReference: string): Promise<StoredPayment | null>;
@@ -89,6 +90,7 @@ export interface PaymentStore {
 export type WebhookResult =
   | { outcome: "processed"; httpStatus: 200; paymentStatus: PaymentStatus; parent: PaymentParent; event: VerifiedPaymentEvent }
   | { outcome: "duplicate"; httpStatus: 200 }
+  | { outcome: "busy"; httpStatus: 503 }
   | { outcome: "ignored"; httpStatus: 200; reason: string }
   | { outcome: "needs_review"; httpStatus: 200; reason: string }
   | { outcome: "rejected"; httpStatus: 400 | 401; reason: string };
@@ -111,9 +113,10 @@ export async function handlePaymentWebhook(input: {
     throw error;
   }
 
-  if ((await store.recordEvent(event)) === "duplicate") {
-    return { outcome: "duplicate", httpStatus: 200 };
-  }
+  const claim = await store.recordEvent(event);
+  if (claim === "duplicate") return { outcome: "duplicate", httpStatus: 200 };
+  // The provider retries on 5xx, by which time the other delivery has finished.
+  if (claim === "busy") return { outcome: "busy", httpStatus: 503 };
 
   const finish = async (result: WebhookResult, error: string | null = null) => {
     await store.markEventProcessed(event.provider, event.eventId, error);

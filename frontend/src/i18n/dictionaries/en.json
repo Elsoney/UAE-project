@@ -289,7 +289,6 @@
     "confirmBooking": "Confirm booking",
     "startPreparing": "Start preparing",
     "markCompleted": "Mark completed",
-    "paymentLinksSoon": "Payment links will be available once the payment provider is set up. Until then, a booking that needs a deposit cannot be confirmed here.",
     "rejectTitle": "Not possible",
     "reject": "Decline request",
     "cancelTitle": "Cancel",
@@ -319,7 +318,29 @@
       "date_unavailable": "That date is in the past or not available.",
       "forbidden": "Your account cannot make this change.",
       "not_found": "This record no longer exists.",
-      "failed": "The change could not be saved. Please try again."
-    }
+      "failed": "The change could not be saved. Please try again.",
+      "no_payment_required": "No payment is required for this booking.",
+      "already_paid": "The required payment has already been received."
+    },
+    "sendPaymentLink": "Send payment link",
+    "resendPaymentLink": "Send a new link",
+    "paymentLinkSent": "Payment link sent: {amount}",
+    "paymentLinkExpires": "Valid until {date}",
+    "openPaymentLink": "Open payment link",
+    "paymentsReceived": "Payments received",
+    "testMode": "Test mode: payments use the test provider. No real money moves."
+  },
+  "checkout": {
+    "title": "Secure payment",
+    "testBanner": "TEST PAYMENT PAGE — no real money is charged. This page is replaced by the payment provider's secure page at launch.",
+    "reference": "Booking reference",
+    "amountDue": "Amount due now",
+    "pay": "Pay {amount} (test)",
+    "fail": "Simulate a declined card",
+    "paidTitle": "Payment received",
+    "paidBody": "Thank you. The restaurant will now confirm your booking and email you the details.",
+    "failedBody": "The payment did not go through. No money was taken. You can try again.",
+    "closed": "This payment link is no longer valid. Please contact the restaurant for a new one.",
+    "notFound": "We could not find this payment link."
   }
 }
